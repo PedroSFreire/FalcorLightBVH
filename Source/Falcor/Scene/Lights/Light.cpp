@@ -232,6 +232,7 @@ namespace Falcor
     {
         float3 fwd = float3(-transform.getCol(2));
         float3 pos = float3(transform.getCol(3));
+        changed = true;
         setWorldPosition(pos);
         setWorldDirection(fwd);
     }

@@ -48,6 +48,8 @@ namespace Falcor
         using SharedPtr = std::shared_ptr<Light>;
         using SharedConstPtr = std::shared_ptr<const Light>;
 
+        bool changed = false;
+
         virtual ~Light() = default;
 
         /** Set the light parameters into a shader variable. To use this you need to include/import 'ShaderCommon' inside your shader.

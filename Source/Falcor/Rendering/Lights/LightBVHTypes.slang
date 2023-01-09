@@ -38,7 +38,7 @@ BEGIN_NAMESPACE_FALCOR
 
 // Uncomment this define to use uncompressed nodes for debugging purposes.
 // Note that the compression is lossy and may add a slight bias and/or variance.
-//#define USE_UNCOMPRESSED_NODES
+#define USE_UNCOMPRESSED_NODES
 
 static const float kInvalidCosConeAngle = -1.f;
 

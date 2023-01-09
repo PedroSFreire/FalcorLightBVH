@@ -192,6 +192,10 @@ target_sources(Falcor PRIVATE
     Rendering/Lights/LightBVHTypes.slang
     Rendering/Lights/LightHelpers.slang
 
+
+
+
+
     Rendering/Materials/AnisotropicGGX.slang
     Rendering/Materials/BCSDFConfig.slangh
     Rendering/Materials/BSDFIntegrator.cpp

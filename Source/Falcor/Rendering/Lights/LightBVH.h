@@ -153,6 +153,9 @@ namespace Falcor
 
         // CPU resources
         mutable std::vector<PackedNode>       mNodes;                   ///< CPU-side copy of packed BVH nodes.
+        mutable std::vector<PackedNode>       mTLAS;                   ///< CPU-side copy of packed TLAS nodes.
+        mutable std::vector<std::vector<PackedNode>>       mBLAS;      ///< CPU-side copy of packed BLASes nodes per light.
+
         std::vector<uint32_t>                 mNodeIndices;             ///< Array of all node indices sorted by tree depth.
         std::vector<RefitEntryInfo>           mPerDepthRefitEntryInfo;  ///< Array containing for each level the number of internal nodes as well as the corresponding offset into 'mpNodeIndicesBuffer'; the very last entry contains the same data, but for all leaf nodes instead.
         uint32_t                              mMaxTriangleCountPerLeaf = 0; ///< After the BVH is built, this contains the maximum light count per leaf node.

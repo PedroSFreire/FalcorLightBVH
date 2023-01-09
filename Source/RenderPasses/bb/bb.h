@@ -1,5 +1,5 @@
 /***************************************************************************
- # Copyright (c) 2015-22, NVIDIA CORPORATION. All rights reserved.
+ # Copyright (c) 2015-21, NVIDIA CORPORATION. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions
@@ -26,37 +26,33 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 #pragma once
-#include "Utils/HostDeviceShared.slangh"
+#include "Falcor.h"
 
-BEGIN_NAMESPACE_FALCOR
+using namespace Falcor;
 
-/** This enum is shared between CPU/GPU.
-    It enumerates the different emissive light samplers that are available.
-*/
-enum class EmissiveLightSamplerType : uint32_t
+class bb : public RenderPass
 {
-    Uniform     = 0,
-    LightBVH    = 1,
-    Power       = 2,
-    TwoLevelLightBVH = 3,
+public:
+    using SharedPtr = std::shared_ptr<bb>;
 
-    Null        = 0xff,
+    static const Info kInfo;
+
+    /** Create a new render pass object.
+        \param[in] pRenderContext The render context.
+        \param[in] dict Dictionary of serialized parameters.
+        \return A new object, or an exception is thrown if creation failed.
+    */
+    static SharedPtr create(RenderContext* pRenderContext = nullptr, const Dictionary& dict = {});
+
+    virtual Dictionary getScriptingDictionary() override;
+    virtual RenderPassReflection reflect(const CompileData& compileData) override;
+    virtual void compile(RenderContext* pRenderContext, const CompileData& compileData) override {}
+    virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
+    virtual void renderUI(Gui::Widgets& widget) override;
+    virtual void setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) override {}
+    virtual bool onMouseEvent(const MouseEvent& mouseEvent) override { return false; }
+    virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
+
+private:
+    bb() : RenderPass(kInfo) {}
 };
-
-// For shader specialization in EmissiveLightSampler.slang we can't use the enums.
-// TODO: Find a way to remove this workaround.
-#define EMISSIVE_LIGHT_SAMPLER_UNIFORM      0
-#define EMISSIVE_LIGHT_SAMPLER_LIGHT_BVH    1
-#define EMISSIVE_LIGHT_SAMPLER_POWER        2
-#define EMISSIVE_TWO_LEVEL_LIGHT_SAMPLER_LIGHT_BVH    3
-#define EMISSIVE_LIGHT_SAMPLER_NULL         0xff
-
-#ifdef HOST_CODE
-static_assert((uint32_t)EmissiveLightSamplerType::Uniform == EMISSIVE_LIGHT_SAMPLER_UNIFORM);
-static_assert((uint32_t)EmissiveLightSamplerType::LightBVH == EMISSIVE_LIGHT_SAMPLER_LIGHT_BVH);
-static_assert((uint32_t)EmissiveLightSamplerType::Power == EMISSIVE_LIGHT_SAMPLER_POWER);
-static_assert((uint32_t)EmissiveLightSamplerType::TwoLevelLightBVH == EMISSIVE_TWO_LEVEL_LIGHT_SAMPLER_LIGHT_BVH);
-static_assert((uint32_t)EmissiveLightSamplerType::Null == EMISSIVE_LIGHT_SAMPLER_NULL);
-#endif
-
-END_NAMESPACE_FALCOR

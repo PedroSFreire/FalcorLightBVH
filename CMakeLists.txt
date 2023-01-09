@@ -100,7 +100,7 @@ execute_process(
 # -----------------------------------------------------------------------------
 
 # Setup workaround for re-running mt.exe when it fails due to a race condition with AV software.
-include(mt-retry)
+#include(mt-retry)
 
 # On Linux, we build with RPATH set to $ORIGIN to make build relocatable.
 if(FALCOR_LINUX)

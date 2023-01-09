@@ -25,38 +25,48 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#pragma once
-#include "Utils/HostDeviceShared.slangh"
+#include "bb.h"
+#include "RenderGraph/RenderPassLibrary.h"
 
-BEGIN_NAMESPACE_FALCOR
+const RenderPass::Info bb::kInfo { "bb", "Insert pass description here." };
 
-/** This enum is shared between CPU/GPU.
-    It enumerates the different emissive light samplers that are available.
-*/
-enum class EmissiveLightSamplerType : uint32_t
+// Don't remove this. it's required for hot-reload to function properly
+extern "C" FALCOR_API_EXPORT const char* getProjDir()
 {
-    Uniform     = 0,
-    LightBVH    = 1,
-    Power       = 2,
-    TwoLevelLightBVH = 3,
+    return PROJECT_DIR;
+}
 
-    Null        = 0xff,
-};
+extern "C" FALCOR_API_EXPORT void getPasses(Falcor::RenderPassLibrary& lib)
+{
+    lib.registerPass(bb::kInfo, bb::create);
+}
 
-// For shader specialization in EmissiveLightSampler.slang we can't use the enums.
-// TODO: Find a way to remove this workaround.
-#define EMISSIVE_LIGHT_SAMPLER_UNIFORM      0
-#define EMISSIVE_LIGHT_SAMPLER_LIGHT_BVH    1
-#define EMISSIVE_LIGHT_SAMPLER_POWER        2
-#define EMISSIVE_TWO_LEVEL_LIGHT_SAMPLER_LIGHT_BVH    3
-#define EMISSIVE_LIGHT_SAMPLER_NULL         0xff
+bb::SharedPtr bb::create(RenderContext* pRenderContext, const Dictionary& dict)
+{
+    SharedPtr pPass = SharedPtr(new bb());
+    return pPass;
+}
 
-#ifdef HOST_CODE
-static_assert((uint32_t)EmissiveLightSamplerType::Uniform == EMISSIVE_LIGHT_SAMPLER_UNIFORM);
-static_assert((uint32_t)EmissiveLightSamplerType::LightBVH == EMISSIVE_LIGHT_SAMPLER_LIGHT_BVH);
-static_assert((uint32_t)EmissiveLightSamplerType::Power == EMISSIVE_LIGHT_SAMPLER_POWER);
-static_assert((uint32_t)EmissiveLightSamplerType::TwoLevelLightBVH == EMISSIVE_TWO_LEVEL_LIGHT_SAMPLER_LIGHT_BVH);
-static_assert((uint32_t)EmissiveLightSamplerType::Null == EMISSIVE_LIGHT_SAMPLER_NULL);
-#endif
+Dictionary bb::getScriptingDictionary()
+{
+    return Dictionary();
+}
 
-END_NAMESPACE_FALCOR
+RenderPassReflection bb::reflect(const CompileData& compileData)
+{
+    // Define the required resources here
+    RenderPassReflection reflector;
+    //reflector.addOutput("dst");
+    //reflector.addInput("src");
+    return reflector;
+}
+
+void bb::execute(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    // renderData holds the requested resources
+    // auto& pTexture = renderData.getTexture("src");
+}
+
+void bb::renderUI(Gui::Widgets& widget)
+{
+}
