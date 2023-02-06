@@ -284,6 +284,7 @@ struct LightBVHSampler : IEmissiveLightSampler
         nodeIndex = 0;
         bool isLeaf = _lightBVH.isLeaf(nodeIndex);
 
+
         while (!isLeaf)
         {
             uint leftNodeIndex = nodeIndex + 1;

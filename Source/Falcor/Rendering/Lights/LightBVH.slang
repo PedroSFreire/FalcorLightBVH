@@ -33,6 +33,8 @@ __exported import LightBVHTypes;
 struct LightBVH
 {
     [root] StructuredBuffer<PackedNode> nodes;      ///< Buffer containing all the nodes from the BVH, with the root node located at index 0.
+    StructuredBuffer<PackedNode> TLAS;              ///< Buffer containing all the nodes from the TLAS, with the root node located at index 0.
+    StructuredBuffer<PackedNode> BLAS;              ///< Buffer containing all the nodes from the BLASes.
     StructuredBuffer<uint> triangleIndices;         ///< Buffer containing the indices of all emissive triangles. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
 

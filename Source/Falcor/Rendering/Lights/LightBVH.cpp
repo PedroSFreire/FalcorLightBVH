@@ -281,6 +281,16 @@ namespace Falcor
             mpBVHNodesBuffer = Buffer::createStructured(var["nodes"], (uint32_t)mNodes.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
             mpBVHNodesBuffer->setName("LightBVH::mpBVHNodesBuffer");
         }
+        if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())
+        {
+            mpTLASNodesBuffer = Buffer::createStructured(var["TLAS"], (uint32_t)mTLAS.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
+            mpTLASNodesBuffer->setName("LightBVH::mpTLASNodesBuffer");
+        }
+        if (!mpBLASNodesBuffer || mpBLASNodesBuffer->getElementCount() < mBLAS.size())
+        {
+            mpBLASNodesBuffer = Buffer::createStructured(var["BLAS"], (uint32_t)mBLAS.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
+            mpBLASNodesBuffer->setName("LightBVH::mpBLASNodesBuffer");
+        }
         if (!mpTriangleIndicesBuffer || mpTriangleIndicesBuffer->getElementCount() < triangleIndices.size())
         {
             mpTriangleIndicesBuffer = Buffer::createStructured(var["triangleIndices"], (uint32_t)triangleIndices.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
@@ -296,6 +306,14 @@ namespace Falcor
         FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
         FALCOR_ASSERT(mpBVHNodesBuffer->getStructSize() == sizeof(mNodes[0]));
         mpBVHNodesBuffer->setBlob(mNodes.data(), 0, mNodes.size() * sizeof(mNodes[0]));
+
+        FALCOR_ASSERT(mpTLASNodesBuffer->getElementCount() >= mTLAS.size());
+        FALCOR_ASSERT(mpTLASNodesBuffer->getStructSize() == sizeof(mTLAS[0]));
+        mpTLASNodesBuffer->setBlob(mTLAS.data(), 0, mTLAS.size() * sizeof(mTLAS[0]));
+
+        FALCOR_ASSERT(mpBLASNodesBuffer->getElementCount() >= mBLAS.size());
+        FALCOR_ASSERT(mpBLASNodesBuffer->getStructSize() == sizeof(mBLAS[0]));
+        mpBLASNodesBuffer->setBlob(mBLAS.data(), 0, mBLAS.size() * sizeof(mBLAS[0]));
 
         FALCOR_ASSERT(mpTriangleIndicesBuffer->getSize() >= triangleIndices.size() * sizeof(triangleIndices[0]));
         mpTriangleIndicesBuffer->setBlob(triangleIndices.data(), 0, triangleIndices.size() * sizeof(triangleIndices[0]));
@@ -316,6 +334,16 @@ namespace Falcor
         FALCOR_ASSERT(mNodes.size() > 0 && mNodes.size() <= mpBVHNodesBuffer->getElementCount());
         std::memcpy(mNodes.data(), ptr, mNodes.size() * sizeof(mNodes[0]));
         mpBVHNodesBuffer->unmap();
+
+        const void* const ptrTLAS = mpTLASNodesBuffer->map(Buffer::MapType::Read);
+        FALCOR_ASSERT(mTLAS.size() > 0 && mTLAS.size() <= mpTLASNodesBuffer->getElementCount());
+        std::memcpy(mTLAS.data(), ptrTLAS, mTLAS.size() * sizeof(mTLAS[0]));
+        mpTLASNodesBuffer->unmap();
+
+        const void* const ptrBLAS = mpBLASNodesBuffer->map(Buffer::MapType::Read);
+        FALCOR_ASSERT(mBLAS.size() > 0 && mBLAS.size() <= mpBLASNodesBuffer->getElementCount());
+        std::memcpy(mBLAS.data(), ptrBLAS, mBLAS.size() * sizeof(mBLAS[0]));
+        mpBLASNodesBuffer->unmap();
         mIsCpuDataValid = true;
     }
 
@@ -325,6 +353,8 @@ namespace Falcor
         {
             FALCOR_ASSERT(var.isValid());
             var["nodes"] = mpBVHNodesBuffer;
+            var["TLAS"] = mpTLASNodesBuffer;
+            var["BLAS"] = mpBLASNodesBuffer;
             var["triangleIndices"] = mpTriangleIndicesBuffer;
             var["triangleBitmasks"] = mpTriangleBitmasksBuffer;
         }

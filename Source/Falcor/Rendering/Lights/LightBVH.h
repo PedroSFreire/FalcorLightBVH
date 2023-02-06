@@ -154,7 +154,9 @@ namespace Falcor
         // CPU resources
         mutable std::vector<PackedNode>       mNodes;                   ///< CPU-side copy of packed BVH nodes.
         mutable std::vector<PackedNode>       mTLAS;                   ///< CPU-side copy of packed TLAS nodes.
-        mutable std::vector<std::vector<PackedNode>>       mBLAS;      ///< CPU-side copy of packed BLASes nodes per light.
+        mutable std::vector<PackedNode>       mBLAS;      ///< CPU-side copy of packed BLASes nodes per light.
+        mutable std::vector<uint32_t>         lightNodeIndices;             ///< Array of first triangle indices of each light.
+
 
         std::vector<uint32_t>                 mNodeIndices;             ///< Array of all node indices sorted by tree depth.
         std::vector<RefitEntryInfo>           mPerDepthRefitEntryInfo;  ///< Array containing for each level the number of internal nodes as well as the corresponding offset into 'mpNodeIndicesBuffer'; the very last entry contains the same data, but for all leaf nodes instead.
@@ -165,6 +167,8 @@ namespace Falcor
 
         // GPU resources
         Buffer::SharedPtr                     mpBVHNodesBuffer;         ///< Buffer holding all BVH nodes.
+        Buffer::SharedPtr                     mpTLASNodesBuffer;         ///< Buffer holding all BVH nodes.
+        Buffer::SharedPtr                     mpBLASNodesBuffer;         ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                     mpTriangleIndicesBuffer;  ///< Triangle indices sorted by leaf node. Each leaf node refers to a contiguous array of triangle indices.
         Buffer::SharedPtr                     mpTriangleBitmasksBuffer; ///< Array containing the per triangle bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
         Buffer::SharedPtr                     mpNodeIndicesBuffer;      ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
