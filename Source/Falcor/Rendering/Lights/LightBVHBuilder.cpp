@@ -252,7 +252,10 @@ namespace Falcor
         // For each triangle, precompute data we need for the build.
         BuildingData data(bvh.mNodes,bvh.mTLAS,bvh.mBLAS,bvh.lightNodeIndices);
         data.trianglesData.reserve(triangles.size());
-        data.lightsData.resize(lights.size());
+        data.lightsData.reserve(lights.size());
+
+        std::vector<LightSortData> lightsData;
+        lightsData.resize(lights.size());
         
 
         for (size_t i = 0; i < triangles.size(); i++)
@@ -271,23 +274,29 @@ namespace Falcor
                 tri.triangleIndex = static_cast<uint32_t>(i);
                 tri.lightIndex = triangles[i].lightIdx;
                 data.trianglesData.push_back(tri);
-                data.lightsData[tri.lightIndex] |= tri;
-                if (data.lightsData[tri.lightIndex].triangleCount == 0) data.lightsData[tri.lightIndex].firstTriangleIndex = data.trianglesData.size()-1;
-                data.lightsData[tri.lightIndex].triangleCount += 1;
+                lightsData[tri.lightIndex] |= tri;
+                if (lightsData[tri.lightIndex].triangleCount == 0) lightsData[tri.lightIndex].firstTriangleIndex = data.trianglesData.size()-1;
+                lightsData[tri.lightIndex].triangleCount += 1;
             }
         }
 
         for (size_t i = 0; i < lights.size(); i++) {
-            data.lightsData[i].lightIndex = i;
-            data.lightsData[i].triangleIndex = lights[i].triangleOffset;
-            data.lightsData[i].center = data.lightsData[i].bounds.center();
-            data.lightsData[i].cosConeAngle = glm::length(data.lightsData[i].coneDirection) < FLT_MIN ? kInvalidCosConeAngle : 1.0f;
-            data.lightsData[i].coneDirection = glm::normalize(data.lightsData[i].coneDirection);
-            for (size_t j = data.lightsData[i].firstTriangleIndex; j < data.lightsData[i].firstTriangleIndex + data.lightsData[i].triangleCount; j++)
+            lightsData[i].lightIndex = i;
+            lightsData[i].triangleIndex = lights[i].triangleOffset;
+            lightsData[i].center = lightsData[i].bounds.center();
+            lightsData[i].cosConeAngle = glm::length(lightsData[i].coneDirection) < FLT_MIN ? kInvalidCosConeAngle : 1.0f;
+            lightsData[i].coneDirection = glm::normalize(lightsData[i].coneDirection);
+            for (size_t j = lightsData[i].firstTriangleIndex; j < lightsData[i].firstTriangleIndex + lightsData[i].triangleCount; j++)
             {
-                data.lightsData[i].cosConeAngle = computeCosConeAngle(data.lightsData[i].coneDirection, data.lightsData[i].cosConeAngle, data.trianglesData[j].coneDirection, data.trianglesData[j].cosConeAngle);
+                lightsData[i].cosConeAngle = computeCosConeAngle(lightsData[i].coneDirection, lightsData[i].cosConeAngle, data.trianglesData[j].coneDirection, data.trianglesData[j].cosConeAngle);
             }
         }
+        for (size_t i = 0; i < lights.size(); i++) {
+            if (lightsData[i].flux > 0.f) {
+                data.lightsData.push_back(lightsData[i]);
+            }
+        }
+
         
 
         // If there are no non-culled triangles, we're done.
@@ -418,6 +427,7 @@ namespace Falcor
             nodeBounds |= data.lightsData[dataIndex].bounds;
             nodeFlux += data.lightsData[dataIndex].flux;
         }
+
         FALCOR_ASSERT(nodeBounds.valid());
 
         data.currentNodeFlux = nodeFlux;
