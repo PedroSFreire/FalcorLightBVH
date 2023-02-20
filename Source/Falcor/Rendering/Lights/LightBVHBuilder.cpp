@@ -321,10 +321,7 @@ namespace Falcor
         data.lightNodeIndices.resize(lights.size());
 
         data.BLASTriangleIndices.resize(lights.size());
-        for (int i = 0; i < lightCount; i++) {
-            data.BLASTriangleIndices[i].reserve(lights[i].triangleCount);
-        }
-
+        data.BLASTriangleIndices.reserve(data.trianglesData.size());
 
         const uint64_t invalidBitmask = std::numeric_limits<uint64_t>::max();
         data.triangleBitmasks.resize(triangles.size(), invalidBitmask); // This is sized based on input triangle count, as it's indexed by global triangle index.
@@ -346,17 +343,17 @@ namespace Falcor
         size_t numValid = 0;
         for (auto mask : data.triangleBitmasks)
             if (mask != invalidBitmask) numValid++;
-        FALCOR_ASSERT(numValid == data.trianglesData.size());
+        //FALCOR_ASSERT(numValid == data.trianglesData.size());
 
         // Compute per-node light bounding cones.
         float cosConeAngle;
-        computeLightingConesInternal(0, data, cosConeAngle);
+        //computeLightingConesInternal(0, data, cosConeAngle);
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
 
         // The BVH is ready, mark it as valid and upload the data.
         bvh.mIsValid = true;
         bvh.mMaxTriangleCountPerLeaf = mOptions.maxTriangleCountPerLeaf;
-        bvh.uploadCPUBuffers(data.triangleIndices, data.triangleBitmasks);
+        bvh.uploadCPUBuffers(data.BLASTriangleIndices, data.BLASTriangleBitmasks);
 
         // Computate metadata.
         bvh.finalize();
@@ -574,20 +571,20 @@ namespace Falcor
            node.attribs.cosConeAngle = cosTheta;
 
            node.triangleCount = triangleRange.length();
-           node.triangleOffset = (uint32_t)data.BLASTriangleIndices[lightId].size();
+           node.triangleOffset = (uint32_t)data.BLASTriangleIndices.size();
            FALCOR_ASSERT(node.triangleCount < kMaxLeafTriangleCount);
            FALCOR_ASSERT(node.triangleOffset < kMaxLeafTriangleOffset);
 
            for (uint32_t triangleIdx = triangleRange.begin, index = 0; triangleIdx < triangleRange.end; ++triangleIdx, ++index)
            {
                uint32_t globalTriangleIndex = data.trianglesData[triangleIdx].triangleIndex;
-               data.BLASTriangleIndices[lightId].push_back(globalTriangleIndex);
+               data.BLASTriangleIndices.push_back(globalTriangleIndex);
                data.BLASTriangleBitmasks[globalTriangleIndex] = bitmask;
 
            }
 
 
-           FALCOR_ASSERT(data.BLASTriangleIndices[lightId].size() == node.triangleOffset + node.triangleCount);
+           FALCOR_ASSERT(data.BLASTriangleIndices.size() == node.triangleOffset + node.triangleCount);
 
            data.BLAS[nodeIndex].setLeafNode(node);
            return nodeIndex;
@@ -673,10 +670,10 @@ namespace Falcor
             for (uint32_t triangleIdx = triangleRange.begin, index = 0; triangleIdx < triangleRange.end; ++triangleIdx, ++index)
             {
                 uint32_t globalTriangleIndex = data.trianglesData[triangleIdx].triangleIndex;
-                data.triangleIndices.push_back(globalTriangleIndex);
-                data.triangleBitmasks[globalTriangleIndex] = bitmask;
+                //data.triangleIndices.push_back(globalTriangleIndex);
+                //data.triangleBitmasks[globalTriangleIndex] = bitmask;
             }
-            FALCOR_ASSERT(data.triangleIndices.size() == node.triangleOffset + node.triangleCount);
+            //FALCOR_ASSERT(data.triangleIndices.size() == node.triangleOffset + node.triangleCount);
 
             data.nodes[nodeIndex].setLeafNode(node);
             return nodeIndex;

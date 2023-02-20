@@ -77,6 +77,8 @@ struct LightBVHSampler : IEmissiveLightSampler
     {
         if (gScene.lightCollection.isEmpty()) return false;
 
+
+
         // Stochastically traverse the light BVH to pick a triangle.
         uint triangleIndex;
         float trianglePdf;
@@ -278,6 +280,8 @@ struct LightBVHSampler : IEmissiveLightSampler
         \param[out] nodeIndex The index of the sampled BVH leaf node, only valid if true is returned.
         \return True if a leaf node was sampled, false otherwise.
     */
+
+
     bool traverseTree(const float3 posW, const float3 normalW, const bool upperHemisphere, inout float u, out float pdf, out uint nodeIndex)
     {
         pdf = 1.0f;
@@ -315,6 +319,112 @@ struct LightBVHSampler : IEmissiveLightSampler
             }
 
             isLeaf = _lightBVH.isLeaf(nodeIndex);
+        }
+
+        return true;
+    }
+
+
+    /** Traverses the TLAS to select a BLAS to sample.
+        \param[in] posW Shading point in world space.
+        \param[in] normalW Normal at the shading point in world space.
+        \param[in] upperHemisphere True if only upper hemisphere should be considered.
+        \param[in,out] u Uniform random number. Upon return, u is still uniform and can be used for sampling among the triangles in the leaf node.
+        \param[out] pdf Probabiliy of the sampled leaf node, only valid if true is returned.
+        \param[out] nodeIndex The index of the sampled BVH leaf node, only valid if true is returned.
+        \return True if a leaf node was sampled, false otherwise.
+    */
+
+    bool traverseTLAS(const float3 posW, const float3 normalW, const bool upperHemisphere, inout float u, out float pdf,  out uint BLASNode)
+    {
+        pdf = 1.0f;
+        uint TLASNode = 0;
+        bool isLeaf = _lightBVH.isTLASLeaf(TLASNode);
+
+
+        while (!isLeaf)
+        {
+            uint leftNodeIndex = TLASNode + 1;
+            uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
+
+            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+
+            float totalImportance = leftNodeImportance + rightNodeImportance;
+
+            // If both nodes have importance being zero, there is no need to continue.
+            if (totalImportance == 0.f) return false;
+
+            float pLeft = leftNodeImportance / totalImportance; // Probability of visiting left child.
+            float pRight = 1.0f - pLeft;
+
+            if (u < pLeft) // Traverse left node
+            {
+                u = u / pLeft;  // Rescale to [0,1).
+                pdf *= pLeft;
+                TLASNode = leftNodeIndex;
+            }
+            else // Traverse right node
+            {
+                u = (u - pLeft) / pRight;  // Rescale to [0,1).
+                pdf *= pRight;
+                TLASNode = rightNodeIndex;
+            }
+
+            isLeaf = _lightBVH.isTLASLeaf(TLASNode);
+        }
+        traverseBLAS(posW,normalW,upperHemisphere, u, pdf, TLASNode ,BLASNode);
+        return true;
+    }
+
+
+
+    /** Traverses the BLAS to select a node to sample.
+        \param[in] posW Shading point in world space.
+        \param[in] normalW Normal at the shading point in world space.
+        \param[in] upperHemisphere True if only upper hemisphere should be considered.
+        \param[in,out] u Uniform random number. Upon return, u is still uniform and can be used for sampling among the triangles in the leaf node.
+        \param[out] pdf Probabiliy of the sampled leaf node, only valid if true is returned.
+        \param[out] nodeIndex The index of the sampled BVH leaf node, only valid if true is returned.
+        \return True if a leaf node was sampled, false otherwise.
+    */
+
+    bool traverseBLAS(const float3 posW, const float3 normalW, const bool upperHemisphere, inout float u, inout float pdf, inout uint TLASNode, out uint BLASNode)
+    {
+        BLASNode = _lightBVH.getLeafTLASNode(TLASNode).triangleOffset;
+        bool isLeaf = _lightBVH.isBLASLeaf(BLASNode);
+
+
+        while (!isLeaf)
+        {
+            uint leftNodeIndex = BLASNode + 1;
+            uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
+
+            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+
+            float totalImportance = leftNodeImportance + rightNodeImportance;
+
+            // If both nodes have importance being zero, there is no need to continue.
+            if (totalImportance == 0.f) return false;
+
+            float pLeft = leftNodeImportance / totalImportance; // Probability of visiting left child.
+            float pRight = 1.0f - pLeft;
+
+            if (u < pLeft) // Traverse left node
+            {
+                u = u / pLeft;  // Rescale to [0,1).
+                pdf *= pLeft;
+                BLASNode = leftNodeIndex;
+            }
+            else // Traverse right node
+            {
+                u = (u - pLeft) / pRight;  // Rescale to [0,1).
+                pdf *= pRight;
+                BLASNode = rightNodeIndex;
+            }
+
+            isLeaf = _lightBVH.isBLASLeaf(BLASNode);
         }
 
         return true;
@@ -413,6 +523,61 @@ struct LightBVHSampler : IEmissiveLightSampler
         }
     }
 
+
+
+     /** Pick a triangle in a leaf node to sample.
+        \param[in] posW Shading point in world space.
+        \param[in] normalW Normal at the shading point in world space.
+        \param[in] upperHemisphere True if only upper hemisphere should be considered.
+        \param[in] nodeIndex The index of the BVH leaf node.
+        \param[in] u Uniform random number.
+        \param[out] pdf Probabiliy of the sampled triangle, only valid if true is returned.
+        \param[out] triangleIndex Index of the sampled triangle, only valid if true is returned.
+        \return True if a triangle was sampled, false otherwise.
+    */
+    bool pickBLASTriangle(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex, const float u, out float pdf, out uint triangleIndex)
+    {
+        const LeafNode node = _lightBVH.getLeafBLASNode(nodeIndex);
+
+        if (kUseUniformTriangleSampling)
+        {
+            uint idx = min((uint)(u * node.triangleCount), node.triangleCount - 1); // Safety precaution in case u == 1.0 (it shouldn't be).
+            triangleIndex = _lightBVH.getNodeTriangleIndex(node, idx);
+            pdf = 1.0f / (float)node.triangleCount;
+            return true;
+        }
+        else
+        {
+            float pdfs[kActualMaxTrianglesPerNode];
+            float totalImportance = 0.0f;
+
+            for (uint i = 0; i < node.triangleCount; ++i)
+            {
+                uint triIdx = _lightBVH.getNodeTriangleIndex(node, i);
+                pdfs[i] = computeTriangleImportance(posW, normalW, upperHemisphere, triIdx);
+                totalImportance += pdfs[i];
+            }
+
+            // If the total importance is zero, none of the triangles matter so just bail out.
+            if (totalImportance == 0.0f) return false;
+
+            float uScaled = u * totalImportance;
+            float cdf = 0.0f;
+
+            uint idx = 0;
+            for (; idx < node.triangleCount; ++idx)
+            {
+                cdf += pdfs[idx];
+                if (uScaled < cdf) break;
+            }
+
+            idx = min(idx, node.triangleCount - 1); // Safety precaution in case uScaled == cdf (it shouldn't be).
+            triangleIndex = _lightBVH.getNodeTriangleIndex(node, idx);
+            pdf = pdfs[idx] / totalImportance;
+            return true;
+        }
+    }
+
     /** Samples a light using the BVH.
         \param[in] posW Shading point in world space.
         \param[in] normalW Normal at the shading point in world space.
@@ -427,11 +592,11 @@ struct LightBVHSampler : IEmissiveLightSampler
         // Traverse BVH to select a leaf node with N triangles based on estimated probabilities during traversal.
         float leafPdf;
         uint leafNodeIndex;
-        if (!traverseTree(posW, normalW, upperHemisphere, u, leafPdf, leafNodeIndex)) return false;
+        if (!traverseTLAS(posW, normalW, upperHemisphere, u, leafPdf, leafNodeIndex)) return false;
 
         // Within the selected leaf, pick one out of the N triangles to sample.
         float trianglePdf;
-        if (!pickTriangle(posW, normalW, upperHemisphere, leafNodeIndex, u, trianglePdf, triangleIndex)) return false;
+        if (!pickBLASTriangle(posW, normalW, upperHemisphere, leafNodeIndex, u, trianglePdf, triangleIndex)) return false;
 
         pdf = leafPdf * trianglePdf;
         return true;

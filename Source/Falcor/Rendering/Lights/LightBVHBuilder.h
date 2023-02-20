@@ -155,7 +155,7 @@ namespace Falcor
             std::vector<LightSortData> lightsData;          ///< Compact list of lights to include in build.
             std::vector<uint32_t> triangleIndices;          ///< Triangle indices sorted by leaf node. Each leaf node refers to a contiguous array of triangle indices.
             std::vector<uint64_t> triangleBitmasks;         ///< Array containing the per triangle bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child; this array gets filled in during the build process. Indexed by global triangle index.
-            std::vector<std::vector<uint32_t>> BLASTriangleIndices;
+            std::vector<uint32_t> BLASTriangleIndices;
             std::vector<uint64_t> BLASTriangleBitmasks;
             std::vector<uint32_t> lightIndices;          ///< Light indices sorted by leaf node. Each leaf node refers to a contiguous array of light indices.
             std::vector<uint64_t> lightBitmasks;         ///< Array containing the per light bit pattern retracing the tree traversal to reach the light: 0=left child, 1=right child; this array gets filled in during the  TLAS build process. Indexed by global triangle index.
