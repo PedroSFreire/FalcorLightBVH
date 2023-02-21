@@ -272,7 +272,7 @@ namespace Falcor
         mpNodeIndicesBuffer->setBlob(mNodeIndices.data(), 0, mNodeIndices.size() * sizeof(uint32_t));
     }
 
-    void LightBVH::uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks)
+    void LightBVH::uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks)
     {
         // Reallocate buffers if size requirements have changed.
         auto var = mLeafUpdater->getRootVar()["CB"]["gLightBVH"];
@@ -301,6 +301,31 @@ namespace Falcor
             mpTriangleBitmasksBuffer = Buffer::createStructured(var["triangleBitmasks"], (uint32_t)triangleBitmasks.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
             mpTriangleBitmasksBuffer->setName("LightBVH::mpTriangleBitmasksBuffer");
         }
+
+
+
+
+
+
+
+
+
+        if (!mpLightIndicesBuffer || mpLightIndicesBuffer->getElementCount() < lightIndices.size())
+        {
+            mpLightIndicesBuffer = Buffer::createStructured(var["lightIndices"], (uint32_t)lightIndices.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
+            mpLightIndicesBuffer->setName("LightBVH::mpLightIndicesBuffer");
+        }
+        if (!mpLightBitmasksBuffer || mpLightBitmasksBuffer->getElementCount() < lightBitmasks.size())
+        {
+            mpLightBitmasksBuffer = Buffer::createStructured(var["lightBitmasks"], (uint32_t)lightBitmasks.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
+            mpLightBitmasksBuffer->setName("LightBVH::mpLightBitmasksBuffer");
+        }
+
+
+
+
+
+
 
         // Update our GPU side buffers.
         FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
@@ -357,6 +382,8 @@ namespace Falcor
             var["BLAS"] = mpBLASNodesBuffer;
             var["triangleIndices"] = mpTriangleIndicesBuffer;
             var["triangleBitmasks"] = mpTriangleBitmasksBuffer;
+            var["lightIndices"] = mpLightIndicesBuffer;
+            var["lightBitmasks"] = mpLightBitmasksBuffer;
         }
     }
 }

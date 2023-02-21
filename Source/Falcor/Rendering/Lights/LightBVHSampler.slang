@@ -112,14 +112,17 @@ struct LightBVHSampler : IEmissiveLightSampler
         // Load the triangle bitmask as 2x32 bits instead of uint64_t due to driver bug.
         // TODO: Change buffer to uint64_t format and remove this workaround when http://nvbugs/2817745 is fixed.
         //uint64_t bitmask = _lightBVH.triangleBitmasks[hit.triangleIndex];
-        uint2 tmp = _lightBVH.triangleBitmasks[triangleIndex];
+        uint2 tmp = _lightBVH.lightBitmasks[triangleIndex];
         uint64_t bitmask = ((uint64_t)tmp.y << 32) | tmp.x;
+        uint2 Blastmp = _lightBVH.triangleBitmasks[triangleIndex];
+        uint64_t lightBitmask = ((uint64_t)Blastmp.y << 32) | tmp.x;
 
-        uint leafNodeIndex;
-        traversalPdf = evalBVHTraversalPdf(posW, normalW, upperHemisphere, bitmask, leafNodeIndex);
+        uint leafTLASIndex;
+        uint leafBLASIndex;
+        traversalPdf = evalBVHTraversalPdf(posW, normalW, upperHemisphere, bitmask,lightBitmask, leafTLASIndex,leafBLASIndex);
         if (traversalPdf == 0.0f) return 0.0f;
 
-        triangleSelectionPdf = evalNodeSamplingPdf(posW, normalW, upperHemisphere, leafNodeIndex, triangleIndex);
+        triangleSelectionPdf = evalNodeSamplingPdf(posW, normalW, upperHemisphere, leafBLASIndex, triangleIndex);
         if (triangleSelectionPdf == 0.0f) return 0.0f;
 
         return traversalPdf * triangleSelectionPdf;
@@ -134,6 +137,7 @@ struct LightBVHSampler : IEmissiveLightSampler
     */
     float evalPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, const TriangleLightHit hit)
     {
+      
         if (hit.triangleIndex == LightCollection::kInvalidIndex) return 0.f;
 
         float triangleSelectionPdf = evalTriangleSelectionPdf(posW, normalW, upperHemisphere, hit.triangleIndex);
@@ -373,7 +377,7 @@ struct LightBVHSampler : IEmissiveLightSampler
 
             isLeaf = _lightBVH.isTLASLeaf(TLASNode);
         }
-        traverseBLAS(posW,normalW,upperHemisphere, u, pdf, TLASNode ,BLASNode);
+        traverseBLAS(posW,normalW,upperHemisphere,TLASNode , u, pdf, BLASNode);
         return true;
     }
 
@@ -389,7 +393,7 @@ struct LightBVHSampler : IEmissiveLightSampler
         \return True if a leaf node was sampled, false otherwise.
     */
 
-    bool traverseBLAS(const float3 posW, const float3 normalW, const bool upperHemisphere, inout float u, inout float pdf, inout uint TLASNode, out uint BLASNode)
+    bool traverseBLAS(const float3 posW, const float3 normalW, const bool upperHemisphere, uint TLASNode, inout float u, inout float pdf, out uint BLASNode)
     {
         BLASNode = _lightBVH.getLeafTLASNode(TLASNode).triangleOffset;
         bool isLeaf = _lightBVH.isBLASLeaf(BLASNode);
@@ -609,16 +613,16 @@ struct LightBVHSampler : IEmissiveLightSampler
         \param[in] bitmask The bit pattern describing at each level which child was chosen in order to reach the specifide leaf node.
         \param[out] nodeIndex The node index at which the given leaf node is located.
     */
-    float evalBVHTraversalPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, uint64_t bitmask, out uint nodeIndex)
+    float evalBVHTraversalPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, uint64_t bitmask, uint64_t lightBitmask, out uint TLASNode,out uint BLASNode)
     {
         float traversalPdf = 1.0f;
-        nodeIndex = 0;
-        bool isLeaf = _lightBVH.isLeaf(nodeIndex);
+        TLASNode = 0;
+        bool isLeaf = _lightBVH.isTLASLeaf(TLASNode);
 
         while (!isLeaf)
         {
-            uint leftNodeIndex = nodeIndex + 1;
-            uint rightNodeIndex = _lightBVH.getInternalNode(nodeIndex).rightChildIdx;
+            uint leftNodeIndex = TLASNode + 1;
+            uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
 
             float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
             float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
@@ -633,16 +637,57 @@ struct LightBVHSampler : IEmissiveLightSampler
             if (chooseLeftNode) // Traverse left node
             {
                 traversalPdf *= pLeft;
-                nodeIndex = leftNodeIndex;
+                TLASNode = leftNodeIndex;
             }
             else // Traverse right node
             {
                 traversalPdf *= pRight;
-                nodeIndex = rightNodeIndex;
+                TLASNode = rightNodeIndex;
             }
 
             bitmask >>= 1;
-            isLeaf = _lightBVH.isLeaf(nodeIndex);
+            isLeaf = _lightBVH.isTLASLeaf(TLASNode);
+        }
+
+        return evalBLASTraversalPdf(posW,normalW,upperHemisphere,lightBitmask,traversalPdf, TLASNode , BLASNode);
+    }
+
+
+
+
+    float evalBLASTraversalPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, uint64_t lightBitmask,float traversalPdf, uint TLASNode , out uint BLASNode)
+    {
+        BLASNode = _lightBVH.getLeafTLASNode(TLASNode).triangleOffset;
+        bool isLeaf = _lightBVH.isBLASLeaf(BLASNode);
+        
+        while (!isLeaf)
+        {
+            uint leftNodeIndex = BLASNode + 1;
+            uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
+
+            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+
+            float totalImportance = leftNodeImportance + rightNodeImportance;
+            if (totalImportance == 0.f) return 0.0f;
+
+            float pLeft = leftNodeImportance / totalImportance; // Probability of visiting left child.
+            float pRight = 1.0f - pLeft;
+
+            bool chooseLeftNode = (lightBitmask & 0x1) == 0;
+            if (chooseLeftNode) // Traverse left node
+            {
+                traversalPdf *= pLeft;
+                BLASNode = leftNodeIndex;
+            }
+            else // Traverse right node
+            {
+                traversalPdf *= pRight;
+                BLASNode = rightNodeIndex;
+            }
+
+            lightBitmask >>= 1;
+            isLeaf = _lightBVH.isBLASLeaf(BLASNode);
         }
 
         return traversalPdf;
@@ -656,9 +701,9 @@ struct LightBVHSampler : IEmissiveLightSampler
         \param[in] triangleIndex The global index of the triangle that was selected.
         \return Probability density for selecting the given triangle.
     */
-    float evalNodeSamplingPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex, const uint triangleIndex)
+    float evalNodeSamplingPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint leafBLASIndex, const uint triangleIndex)
     {
-        const LeafNode node = _lightBVH.getLeafNode(nodeIndex);
+        const LeafNode node = _lightBVH.getLeafBLASNode(leafBLASIndex);
 
         if (kUseUniformTriangleSampling)
         {

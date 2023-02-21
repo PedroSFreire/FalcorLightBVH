@@ -348,21 +348,23 @@ namespace Falcor
         buildInternal(mOptions, splitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.trianglesData.size())), data);
         TLASBuildInternal(mOptions, splitFunc, TLASSplitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.lightsData.size())), data);
         FALCOR_ASSERT(!data.nodes.empty());
+        InternalNode n = {};
+        data.nodes.push_back({});
 
         size_t numValid = 0;
         for (auto mask : data.triangleBitmasks)
             if (mask != invalidBitmask) numValid++;
-        //FALCOR_ASSERT(numValid == data.trianglesData.size());
+        FALCOR_ASSERT(numValid == data.trianglesData.size());
 
         // Compute per-node light bounding cones.
         float cosConeAngle;
-        //computeLightingConesInternal(0, data, cosConeAngle);
+        computeLightingConesInternal(0, data, cosConeAngle);
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
 
         // The BVH is ready, mark it as valid and upload the data.
         bvh.mIsValid = true;
         bvh.mMaxTriangleCountPerLeaf = mOptions.maxTriangleCountPerLeaf;
-        bvh.uploadCPUBuffers(data.BLASTriangleIndices, data.BLASTriangleBitmasks);
+        bvh.uploadCPUBuffers(data.BLASTriangleIndices, data.BLASTriangleBitmasks, data.lightIndices, data.lightBitmasks);
 
         // Computate metadata.
         bvh.finalize();
@@ -680,8 +682,8 @@ namespace Falcor
             for (uint32_t triangleIdx = triangleRange.begin, index = 0; triangleIdx < triangleRange.end; ++triangleIdx, ++index)
             {
                 uint32_t globalTriangleIndex = data.trianglesData[triangleIdx].triangleIndex;
-                //data.triangleIndices.push_back(globalTriangleIndex);
-                //data.triangleBitmasks[globalTriangleIndex] = bitmask;
+                data.triangleIndices.push_back(globalTriangleIndex);
+                data.triangleBitmasks[globalTriangleIndex] = bitmask;
             }
             //FALCOR_ASSERT(data.triangleIndices.size() == node.triangleOffset + node.triangleCount);
 

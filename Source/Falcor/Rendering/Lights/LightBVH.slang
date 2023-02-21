@@ -37,6 +37,8 @@ struct LightBVH
     StructuredBuffer<PackedNode> BLAS;              ///< Buffer containing all the nodes from the BLASes.
     StructuredBuffer<uint> triangleIndices;         ///< Buffer containing the indices of all emissive triangles. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
+    StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
+    StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
 
     bool isLeaf(uint nodeIndex)
     {
@@ -107,7 +109,8 @@ struct RWLightBVH
     RWStructuredBuffer<PackedNode> BLAS;              ///< Buffer containing all the nodes from the BLASes.
     StructuredBuffer<uint> triangleIndices;         ///< Buffer containing the indices of all emissive triangles. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
-
+    StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
+    StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
     bool isLeaf(uint nodeIndex)
     {
         return nodes[nodeIndex].isLeaf();

@@ -132,7 +132,7 @@ namespace Falcor
         void updateNodeIndices();
         void renderStats(Gui::Widgets& widget, const BVHStats& stats) const;
 
-        void uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks);
+        void uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks);
         void syncDataToCPU() const;
 
         /** Invalidate the BVH.
@@ -171,6 +171,8 @@ namespace Falcor
         Buffer::SharedPtr                     mpBLASNodesBuffer;         ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                     mpTriangleIndicesBuffer;  ///< Triangle indices sorted by leaf node. Each leaf node refers to a contiguous array of triangle indices.
         Buffer::SharedPtr                     mpTriangleBitmasksBuffer; ///< Array containing the per triangle bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
+        Buffer::SharedPtr                     mpLightIndicesBuffer;  ///< Light indices sorted by leaf node. Each leaf node refers to a contiguous array of light indices.
+        Buffer::SharedPtr                     mpLightBitmasksBuffer; ///< Array containing the per light bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
         Buffer::SharedPtr                     mpNodeIndicesBuffer;      ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
 
         friend LightBVHBuilder;
