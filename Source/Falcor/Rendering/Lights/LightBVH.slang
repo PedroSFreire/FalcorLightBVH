@@ -32,7 +32,7 @@ __exported import LightBVHTypes;
 */
 struct LightBVH
 {
-    [root] StructuredBuffer<PackedNode> nodes;      ///< Buffer containing all the nodes from the BVH, with the root node located at index 0.
+    
     StructuredBuffer<PackedNode> TLAS;              ///< Buffer containing all the nodes from the TLAS, with the root node located at index 0.
     StructuredBuffer<PackedNode> BLAS;              ///< Buffer containing all the nodes from the BLASes.
     StructuredBuffer<uint> triangleIndices;         ///< Buffer containing the indices of all emissive triangles. Each leaf node refers to a contiguous range of indices.
@@ -40,11 +40,7 @@ struct LightBVH
     StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
 
-    bool isLeaf(uint nodeIndex)
-    {
-        return nodes[nodeIndex].isLeaf();
-    }
-
+   
     bool isTLASLeaf(uint nodeIndex)
     {
         return TLAS[nodeIndex].isLeaf();
@@ -54,12 +50,6 @@ struct LightBVH
     {
         return BLAS[nodeIndex].isLeaf();
     }
-
-    LeafNode getLeafNode(uint nodeIndex)
-    {
-        return nodes[nodeIndex].getLeafNode();
-    }
-
     LeafNode getLeafTLASNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getLeafNode();
@@ -69,12 +59,6 @@ struct LightBVH
     {
         return BLAS[nodeIndex].getLeafNode();
     }
-
-    InternalNode getInternalNode(uint nodeIndex)
-    {
-        return nodes[nodeIndex].getInternalNode();
-    }
-
     InternalNode getInternalTLASNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getInternalNode();
@@ -85,9 +69,14 @@ struct LightBVH
         return BLAS[nodeIndex].getInternalNode();
     }
 
-    SharedNodeAttributes getNodeAttributes(uint nodeIndex)
+    SharedNodeAttributes getTLASAttributes(uint nodeIndex)
     {
-        return nodes[nodeIndex].getNodeAttributes();
+        return TLAS[nodeIndex].getNodeAttributes();
+    }
+
+    SharedNodeAttributes getBLASAttributes(uint nodeIndex)
+    {
+        return BLAS[nodeIndex].getNodeAttributes();
     }
 
     uint getNodeTriangleIndex(const LeafNode node, uint index)
@@ -104,28 +93,42 @@ struct LightBVH
 */
 struct RWLightBVH
 {
-    [root] RWStructuredBuffer<PackedNode> nodes;    ///< Buffer containing all the nodes from the BVH, with the root node located at index 0.
+    
     RWStructuredBuffer<PackedNode> TLAS;              ///< Buffer containing all the nodes from the TLAS, with the root node located at index 0.
     RWStructuredBuffer<PackedNode> BLAS;              ///< Buffer containing all the nodes from the BLASes.
     StructuredBuffer<uint> triangleIndices;         ///< Buffer containing the indices of all emissive triangles. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
     StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
-    bool isLeaf(uint nodeIndex)
+
+
+    bool isTLASLeaf(uint nodeIndex)
     {
-        return nodes[nodeIndex].isLeaf();
+        return TLAS[nodeIndex].isLeaf();
     }
 
-    LeafNode getLeafNode(uint nodeIndex)
+    bool isBLASLeaf(uint nodeIndex)
     {
-        return nodes[nodeIndex].getLeafNode();
+        return BLAS[nodeIndex].isLeaf();
+    }
+    LeafNode getLeafTLASNode(uint nodeIndex)
+    {
+        return TLAS[nodeIndex].getLeafNode();
     }
 
-    InternalNode getInternalNode(uint nodeIndex)
+    LeafNode getLeafBLASNode(uint nodeIndex)
     {
-        return nodes[nodeIndex].getInternalNode();
+        return BLAS[nodeIndex].getLeafNode();
+    }
+    InternalNode getInternalTLASNode(uint nodeIndex)
+    {
+        return TLAS[nodeIndex].getInternalNode();
     }
 
+    InternalNode getInternalBLASNode(uint nodeIndex)
+    {
+        return BLAS[nodeIndex].getInternalNode();
+    }
     uint getNodeTriangleIndex(const LeafNode node, uint index)
     {
         return triangleIndices[node.triangleOffset + index];
@@ -133,13 +136,23 @@ struct RWLightBVH
 
     // Setters
 
-    void setLeafNode(uint nodeIndex, LeafNode node)
+    void setTLASLeafNode(uint nodeIndex, LeafNode node)
     {
-        nodes[nodeIndex].setLeafNode(node);
+        TLAS[nodeIndex].setLeafNode(node);
     }
 
-    void setInternalNode(uint nodeIndex, InternalNode node)
+    void setTLASInternalNode(uint nodeIndex, InternalNode node)
     {
-        nodes[nodeIndex].setInternalNode(node);
+        TLAS[nodeIndex].setInternalNode(node);
+    }
+
+    void setBLASLeafNode(uint nodeIndex, LeafNode node)
+    {
+        BLAS[nodeIndex].setLeafNode(node);
+    }
+
+    void setBLASInternalNode(uint nodeIndex, InternalNode node)
+    {
+        BLAS[nodeIndex].setInternalNode(node);
     }
 };

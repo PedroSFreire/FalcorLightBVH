@@ -240,7 +240,7 @@ namespace Falcor
         FALCOR_PROFILE("LightBVHBuilder::build()");
 
         bvh.clear();
-        FALCOR_ASSERT(!bvh.isValid() && bvh.mNodes.empty());
+        FALCOR_ASSERT(!bvh.isValid() && bvh.mTLAS.empty() && bvh.mBLAS.empty());
         int lightCount = bvh.mpLightCollection->getStats().meshLightCount;
         // Get global list of emissive triangles.
         FALCOR_ASSERT(bvh.mpLightCollection);
@@ -250,7 +250,7 @@ namespace Falcor
 
         // Create list of triangles that should be included in BVH.
         // For each triangle, precompute data we need for the build.
-        BuildingData data(bvh.mNodes,bvh.mTLAS,bvh.mBLAS,bvh.lightNodeIndices);
+        BuildingData data(bvh.mTLAS,bvh.mBLAS,bvh.lightNodeIndices);
         data.trianglesData.reserve(triangles.size());
         data.lightsData.reserve(lights.size());
 
@@ -316,9 +316,7 @@ namespace Falcor
         // To be grossly conservative, assume each triangle requires two nodes.
         // This is only system RAM and shouldn't be that much, so it's not worth being more careful about it.
         // TODO: Better estimate of how many nodes we will need.
-        data.nodes.clear();
-        data.nodes.reserve(2 * data.trianglesData.size());
-        data.triangleIndices.reserve(data.trianglesData.size());
+
         
         //new structure
 
@@ -333,7 +331,7 @@ namespace Falcor
         data.BLASTriangleIndices.reserve(data.trianglesData.size());
 
         const uint64_t invalidBitmask = std::numeric_limits<uint64_t>::max();
-        data.triangleBitmasks.resize(triangles.size(), invalidBitmask); // This is sized based on input triangle count, as it's indexed by global triangle index.
+
 
         //bitmask for BLASes
         data.BLASTriangleBitmasks.resize(triangles.size(), invalidBitmask);
@@ -345,20 +343,26 @@ namespace Falcor
         // Build the tree.
         SplitHeuristicFunction TLASSplitFunc = TLASgetSplitFunction(mOptions.splitHeuristicSelection);
         SplitHeuristicFunction splitFunc = getSplitFunction(mOptions.splitHeuristicSelection);
-        buildInternal(mOptions, splitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.trianglesData.size())), data);
+        //buildInternal(mOptions, splitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.trianglesData.size())), data);
         TLASBuildInternal(mOptions, splitFunc, TLASSplitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.lightsData.size())), data);
-        FALCOR_ASSERT(!data.nodes.empty());
-        InternalNode n = {};
-        data.nodes.push_back({});
 
-        size_t numValid = 0;
-        for (auto mask : data.triangleBitmasks)
-            if (mask != invalidBitmask) numValid++;
-        FALCOR_ASSERT(numValid == data.trianglesData.size());
+        InternalNode n = {};
+
+
+        //size_t numValid = 0;
+        //for (auto mask : data.triangleBitmasks)
+        //    if (mask != invalidBitmask) numValid++;
+        //FALCOR_ASSERT(numValid == data.trianglesData.size());
 
         // Compute per-node light bounding cones.
         float cosConeAngle;
-        computeLightingConesInternal(0, data, cosConeAngle);
+
+
+        //computeLightingConesInternal(0, data, cosConeAngle);
+
+        //compute this for blas roots
+
+
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
 
         // The BVH is ready, mark it as valid and upload the data.
@@ -604,129 +608,8 @@ namespace Falcor
    }
 
 
-    uint32_t LightBVHBuilder::buildInternal(const Options& options, const SplitHeuristicFunction& SLsplitHeuristic, uint64_t bitmask, uint32_t depth, const Range& triangleRange, BuildingData& data)
-    {
-        FALCOR_ASSERT(triangleRange.begin < triangleRange.end);
-
-        // Compute the AABB and total flux of the node.
-        float nodeFlux = 0.f;
-        AABB nodeBounds;
-        for (uint32_t dataIndex = triangleRange.begin; dataIndex < triangleRange.end; ++dataIndex)
-        {
-            nodeBounds |= data.trianglesData[dataIndex].bounds;
-            nodeFlux += data.trianglesData[dataIndex].flux;
-        }
-        FALCOR_ASSERT(nodeBounds.valid());
-
-        data.currentNodeFlux = nodeFlux;
-
-        bool trySplitting = triangleRange.length() > (options.createLeavesASAP ? options.maxTriangleCountPerLeaf : 1);
-        const SplitResult splitResult = trySplitting ? SLsplitHeuristic(data, triangleRange, nodeBounds, options) : SplitResult();
-
-        // If we should split, then create an internal node and split.
-        if (splitResult.isValid())
-        {
-            FALCOR_ASSERT(triangleRange.begin < splitResult.index&& splitResult.index < triangleRange.end);
-
-            // Sort the centroids and update the lists accordingly.
-            auto comp = [dim = splitResult.axis](const TriangleSortData& d1, const TriangleSortData& d2) { return d1.bounds.center()[dim] < d2.bounds.center()[dim]; };
-            std::nth_element(std::begin(data.trianglesData) + triangleRange.begin, std::begin(data.trianglesData) + splitResult.index, std::begin(data.trianglesData) + triangleRange.end, comp);
-
-            // Allocate internal node.
-            FALCOR_ASSERT(data.nodes.size() < std::numeric_limits<uint32_t>::max());
-            const uint32_t nodeIndex = (uint32_t)data.nodes.size();
-            data.nodes.push_back({});
-
-            InternalNode node = {};
-            node.attribs.setAABB(nodeBounds.minPoint, nodeBounds.maxPoint);
-            node.attribs.flux = nodeFlux;
-            // The lighting normal bounding cone will be computed later when all leaf nodes have been created.
-
-            if (depth >= kMaxBVHDepth)
-            {
-                // This is an unrecoverable error since we use bit masks to represent the traversal path from
-                // the root node to each leaf node in the tree, which is necessary for pdf computation with MIS.
-                throw RuntimeError("BVH depth of {} reached. Maximum of {} allowed.", depth + 1, kMaxBVHDepth);
-            }
-
-            uint32_t leftIndex = buildInternal(options, SLsplitHeuristic, bitmask | (0ull << depth), depth + 1, Range(triangleRange.begin, splitResult.index), data);
-            uint32_t rightIndex = buildInternal(options, SLsplitHeuristic, bitmask | (1ull << depth), depth + 1, Range(splitResult.index, triangleRange.end), data);
-
-            FALCOR_ASSERT(leftIndex == nodeIndex + 1); // The left node should always be placed immediately after the current node.
-            node.rightChildIdx = rightIndex;
-
-            data.nodes[nodeIndex].setInternalNode(node);
-            return nodeIndex;
-        }
-        else // No split => create leaf node
-        {
-            FALCOR_ASSERT(triangleRange.length() <= options.maxTriangleCountPerLeaf);
-
-            // Allocate leaf node.
-            FALCOR_ASSERT(data.nodes.size() < std::numeric_limits<uint32_t>::max());
-            const uint32_t nodeIndex = (uint32_t)data.nodes.size();
-            data.nodes.push_back({});
-
-            LeafNode node = {};
-            node.attribs.setAABB(nodeBounds.minPoint, nodeBounds.maxPoint);
-            node.attribs.flux = nodeFlux;
-            float cosTheta;
-            node.attribs.coneDirection = computeLightingCone(triangleRange, data, cosTheta);
-            node.attribs.cosConeAngle = cosTheta;
-
-            node.triangleCount = triangleRange.length();
-            node.triangleOffset = (uint32_t)data.triangleIndices.size();
-            FALCOR_ASSERT(node.triangleCount < kMaxLeafTriangleCount);
-            FALCOR_ASSERT(node.triangleOffset < kMaxLeafTriangleOffset);
-
-            for (uint32_t triangleIdx = triangleRange.begin, index = 0; triangleIdx < triangleRange.end; ++triangleIdx, ++index)
-            {
-                uint32_t globalTriangleIndex = data.trianglesData[triangleIdx].triangleIndex;
-                data.triangleIndices.push_back(globalTriangleIndex);
-                data.triangleBitmasks[globalTriangleIndex] = bitmask;
-            }
-            //FALCOR_ASSERT(data.triangleIndices.size() == node.triangleOffset + node.triangleCount);
-
-            data.nodes[nodeIndex].setLeafNode(node);
-            return nodeIndex;
-        }
-    }
-
-    float3 LightBVHBuilder::computeLightingConesInternal(const uint32_t nodeIndex, BuildingData& data, float& cosConeAngle)
-    {
-        if (!data.nodes[nodeIndex].isLeaf())
-        {
-            auto node = data.nodes[nodeIndex].getInternalNode();
-
-            uint32_t leftIndex = nodeIndex + 1;
-            uint32_t rightIndex = node.rightChildIdx;
-
-            float leftNodeCosConeAngle = kInvalidCosConeAngle;
-            float3 leftNodeConeDirection = computeLightingConesInternal(leftIndex, data, leftNodeCosConeAngle);
-            float rightNodeCosConeAngle = kInvalidCosConeAngle;
-            float3 rightNodeConeDirection = computeLightingConesInternal(rightIndex, data, rightNodeCosConeAngle);
-
-            // TODO: Asserts in coneUnion
-            //float3 coneDirection = coneUnion(leftNodeConeDirection, leftNodeCosConeAngle,
-            float3 coneDirection = coneUnionOld(leftNodeConeDirection, leftNodeCosConeAngle,
-                rightNodeConeDirection, rightNodeCosConeAngle, cosConeAngle);
-
-            // Update bounding cone.
-            node.attribs.cosConeAngle = cosConeAngle;
-            node.attribs.coneDirection = coneDirection;
-            data.nodes[nodeIndex].setNodeAttributes(node.attribs);
-
-            return coneDirection;
-        }
-        else
-        {
-            // Load bounding cone.
-            auto attribs = data.nodes[nodeIndex].getNodeAttributes();
-            cosConeAngle = attribs.cosConeAngle;
-            return attribs.coneDirection;
-        }
-    }
-
+  
+   
     float3 LightBVHBuilder::computeLightingCone(const Range& triangleRange, const BuildingData& data, float& cosTheta)
     {
         float3 coneDirection = float3(0.0f);
@@ -751,7 +634,7 @@ namespace Falcor
         }
         return coneDirection;
     }
-    // todo this is currently just a copy of computeLightingConesInternal needs to be implemented properly
+    
     float3 LightBVHBuilder::TLAScomputeLightingConesInternal(const uint32_t nodeIndex, BuildingData& data, float& cosConeAngle)
     {
         if (!data.TLAS[nodeIndex].isLeaf())

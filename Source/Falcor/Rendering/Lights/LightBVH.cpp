@@ -129,8 +129,9 @@ namespace Falcor
     void LightBVH::clear()
     {
         // Reset all CPU data.
-        mNodes.clear();
-        mNodeIndices.clear();
+        mTLAS.clear();
+        mBLAS.clear();
+
         mPerDepthRefitEntryInfo.clear();
         mMaxTriangleCountPerLeaf = 0;
         mBVHStats = BVHStats();
@@ -146,7 +147,7 @@ namespace Falcor
 
     void LightBVH::traverseBVH(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t rootNodeIndex)
     {
-        std::stack<NodeLocation> stack({ NodeLocation{ rootNodeIndex, 0 } });
+        /*std::stack<NodeLocation> stack({NodeLocation{rootNodeIndex, 0}});
         while (!stack.empty())
         {
             const NodeLocation location = stack.top();
@@ -165,14 +166,14 @@ namespace Falcor
                 stack.push(NodeLocation{ location.nodeIndex + 1, location.depth + 1 });
                 stack.push(NodeLocation{ node.rightChildIdx, location.depth + 1 });
             }
-        }
+        }*/
     }
 
     void LightBVH::finalize()
     {
         // This function is called after BVH build has finished.
-        computeStats();
-        updateNodeIndices();
+        //computeStats();
+        //updateNodeIndices();
     }
 
     void LightBVH::computeStats()
@@ -201,22 +202,22 @@ namespace Falcor
         };
         auto evalLeaf = [&](const NodeLocation& location)
         {
-            const auto node = mNodes[location.nodeIndex].getLeafNode();
+            //const auto node = mNodes[location.nodeIndex].getLeafNode();
 
             if (mBVHStats.nodeCountPerLevel.size() <= location.depth) mBVHStats.nodeCountPerLevel.push_back(1);
             else ++mBVHStats.nodeCountPerLevel[location.depth];
 
-            ++mBVHStats.leafCountPerTriangleCount[node.triangleCount];
+            //++mBVHStats.leafCountPerTriangleCount[node.triangleCount];
             ++mBVHStats.leafNodeCount;
 
             mBVHStats.treeHeight = std::max(mBVHStats.treeHeight, location.depth);
             mBVHStats.minDepth = std::min(mBVHStats.minDepth, location.depth);
-            mBVHStats.triangleCount += node.triangleCount;
+            //mBVHStats.triangleCount += node.triangleCount;
             return true;
         };
         traverseBVH(evalInternal, evalLeaf);
 
-        mBVHStats.byteSize = (uint32_t)(mNodes.size() * sizeof(mNodes[0]));
+        //mBVHStats.byteSize = (uint32_t)(mNodes.size() * sizeof(mNodes[0]));
     }
 
     void LightBVH::updateNodeIndices()
@@ -263,24 +264,20 @@ namespace Falcor
             [&](const NodeLocation& location) { mNodeIndices[perDepthOffset.back()++] = location.nodeIndex; return true; }
         );
 
-        if (!mpNodeIndicesBuffer || mpNodeIndicesBuffer->getElementCount() < mNodeIndices.size())
+        /*if (!mpNodeIndicesBuffer || mpNodeIndicesBuffer->getElementCount() < mNodeIndices.size())
         {
             mpNodeIndicesBuffer = Buffer::createStructured(sizeof(uint32_t), (uint32_t)mNodeIndices.size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
             mpNodeIndicesBuffer->setName("LightBVH::mpNodeIndicesBuffer");
         }
 
-        mpNodeIndicesBuffer->setBlob(mNodeIndices.data(), 0, mNodeIndices.size() * sizeof(uint32_t));
+        mpNodeIndicesBuffer->setBlob(mNodeIndices.data(), 0, mNodeIndices.size() * sizeof(uint32_t));*/
     }
 
     void LightBVH::uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks)
     {
         // Reallocate buffers if size requirements have changed.
         auto var = mLeafUpdater->getRootVar()["CB"]["gLightBVH"];
-        if (!mpBVHNodesBuffer || mpBVHNodesBuffer->getElementCount() < mNodes.size())
-        {
-            mpBVHNodesBuffer = Buffer::createStructured(var["nodes"], (uint32_t)mNodes.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
-            mpBVHNodesBuffer->setName("LightBVH::mpBVHNodesBuffer");
-        }
+        
         if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())
         {
             mpTLASNodesBuffer = Buffer::createStructured(var["TLAS"], (uint32_t)mTLAS.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
@@ -328,9 +325,9 @@ namespace Falcor
 
 
         // Update our GPU side buffers.
-        FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
-        FALCOR_ASSERT(mpBVHNodesBuffer->getStructSize() == sizeof(mNodes[0]));
-        mpBVHNodesBuffer->setBlob(mNodes.data(), 0, mNodes.size() * sizeof(mNodes[0]));
+        //FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
+        //FALCOR_ASSERT(mpBVHNodesBuffer->getStructSize() == sizeof(mNodes[0]));
+        //mpBVHNodesBuffer->setBlob(mNodes.data(), 0, mNodes.size() * sizeof(mNodes[0]));
 
         FALCOR_ASSERT(mpTLASNodesBuffer->getElementCount() >= mTLAS.size());
         FALCOR_ASSERT(mpTLASNodesBuffer->getStructSize() == sizeof(mTLAS[0]));
@@ -355,10 +352,10 @@ namespace Falcor
 
         // TODO: This is slow because of the flush. We should copy to a staging buffer
         // after the data is updated on the GPU and map the staging buffer here instead.
-        const void* const ptr = mpBVHNodesBuffer->map(Buffer::MapType::Read);
-        FALCOR_ASSERT(mNodes.size() > 0 && mNodes.size() <= mpBVHNodesBuffer->getElementCount());
-        std::memcpy(mNodes.data(), ptr, mNodes.size() * sizeof(mNodes[0]));
-        mpBVHNodesBuffer->unmap();
+        //const void* const ptr = mpBVHNodesBuffer->map(Buffer::MapType::Read);
+        //FALCOR_ASSERT(mNodes.size() > 0 && mNodes.size() <= mpBVHNodesBuffer->getElementCount());
+        //std::memcpy(mNodes.data(), ptr, mNodes.size() * sizeof(mNodes[0]));
+        //mpBVHNodesBuffer->unmap();
 
         const void* const ptrTLAS = mpTLASNodesBuffer->map(Buffer::MapType::Read);
         FALCOR_ASSERT(mTLAS.size() > 0 && mTLAS.size() <= mpTLASNodesBuffer->getElementCount());
@@ -377,7 +374,6 @@ namespace Falcor
         if (isValid())
         {
             FALCOR_ASSERT(var.isValid());
-            var["nodes"] = mpBVHNodesBuffer;
             var["TLAS"] = mpTLASNodesBuffer;
             var["BLAS"] = mpBLASNodesBuffer;
             var["triangleIndices"] = mpTriangleIndicesBuffer;

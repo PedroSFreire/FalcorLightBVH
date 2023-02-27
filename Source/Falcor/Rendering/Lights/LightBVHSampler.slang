@@ -219,9 +219,9 @@ struct LightBVHSampler : IEmissiveLightSampler
         \param[in] nodeIndex Node index in BVH.
         \return Relative importance of this node.
     */
-    float computeImportance(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex)
+    float computeTLASImportance(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex)
     {
-        const SharedNodeAttributes nodeAttribs = _lightBVH.getNodeAttributes(nodeIndex);
+        const SharedNodeAttributes nodeAttribs = _lightBVH.getTLASAttributes(nodeIndex);
 
         float flux = 1.f;
         if (!kDisableNodeFlux) flux = nodeAttribs.flux;
@@ -275,58 +275,65 @@ struct LightBVHSampler : IEmissiveLightSampler
         return (flux * NdotL) * orientationWeight / (distance * distance);
     }
 
-    /** Traverses the light BVH to select a leaf node (range of lights) to sample.
-        \param[in] posW Shading point in world space.
-        \param[in] normalW Normal at the shading point in world space.
-        \param[in] upperHemisphere True if only upper hemisphere should be considered.
-        \param[in,out] u Uniform random number. Upon return, u is still uniform and can be used for sampling among the triangles in the leaf node.
-        \param[out] pdf Probabiliy of the sampled leaf node, only valid if true is returned.
-        \param[out] nodeIndex The index of the sampled BVH leaf node, only valid if true is returned.
-        \return True if a leaf node was sampled, false otherwise.
-    */
 
 
-    bool traverseTree(const float3 posW, const float3 normalW, const bool upperHemisphere, inout float u, out float pdf, out uint nodeIndex)
+    float computeBLASImportance(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex)
     {
-        pdf = 1.0f;
-        nodeIndex = 0;
-        bool isLeaf = _lightBVH.isLeaf(nodeIndex);
+        const SharedNodeAttributes nodeAttribs = _lightBVH.getBLASAttributes(nodeIndex);
 
+        float flux = 1.f;
+        if (!kDisableNodeFlux) flux = nodeAttribs.flux;
 
-        while (!isLeaf)
+        // TODO: Optimize by returning squared distance.
+        float distance = length(nodeAttribs.origin - posW);
+
+        float NdotL = 1.f;
+        float cosThetaBoundingCone = 0.f;
+        if (kUseLightingCone || (kUseBoundingCone && upperHemisphere))
         {
-            uint leftNodeIndex = nodeIndex + 1;
-            uint rightNodeIndex = _lightBVH.getInternalNode(nodeIndex).rightChildIdx;
-
-            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
-            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
-
-            float totalImportance = leftNodeImportance + rightNodeImportance;
-
-            // If both nodes have importance being zero, there is no need to continue.
-            if (totalImportance == 0.f) return false;
-
-            float pLeft = leftNodeImportance / totalImportance; // Probability of visiting left child.
-            float pRight = 1.0f - pLeft;
-
-            if (u < pLeft) // Traverse left node
-            {
-                u = u / pLeft;  // Rescale to [0,1).
-                pdf *= pLeft;
-                nodeIndex = leftNodeIndex;
-            }
-            else // Traverse right node
-            {
-                u = (u - pLeft) / pRight;  // Rescale to [0,1).
-                pdf *= pRight;
-                nodeIndex = rightNodeIndex;
-            }
-
-            isLeaf = _lightBVH.isLeaf(nodeIndex);
+            NdotL = boundCosineTerm(posW, normalW, nodeAttribs.origin, nodeAttribs.extent, cosThetaBoundingCone);
+            if (!(kUseBoundingCone && upperHemisphere)) NdotL = 1.f; // Do not use NdotL bound when full sphere is considered.
         }
 
-        return true;
+        float orientationWeight = 1.f;
+        if (kUseLightingCone)
+        {
+            // Note: coneAngle is the angle of the bounding cone for the node's dominant light directions.
+            // It is _not_ the angle of the bounding cone within which light is emitted.
+            // The current assumption is that all emitters are diffuse, so the actual light cone angle is PI/2 larger than coneAngle.
+            // Conty Estevez and Kulla's 2018 paper uses a second cone angle (theta_e) to bound the emitted light.
+            // We might want to add that to support non-diffuse emitters or switch to another representation altogether.
+            float cosConeAngle = nodeAttribs.cosConeAngle;
+            float3 dirToAabb = (nodeAttribs.origin - posW) / distance;          // TODO: dirToAabb won't be normalized for very short distances, as the computation of distance has a clamp.
+            if (cosConeAngle != kInvalidCosConeAngle && cosConeAngle > 0.f)     // theta_o + theta_e < pi. (Note: assumes theta_e = pi/2!)
+            {
+                float sinConeAngle = sqrt(max(0.f, 1.f - cosConeAngle * cosConeAngle));
+
+                float cosTheta = dot(nodeAttribs.coneDirection, -dirToAabb);    // theta = Angle between dominant light dir
+                float sinTheta = sqrt(max(0.f, 1.f - cosTheta * cosTheta));
+
+                float sinThetaBoundingCone = sqrt(max(0.f, 1 - cosThetaBoundingCone * cosThetaBoundingCone));
+
+                // thetaPrime = max(0.0f, theta - coneAngle - thetaBoundingCone);
+                // First compute the sine and cosine of max(0, theta - coneAngle).
+                float cosTheta0 = cosSubClamped(sinTheta, cosTheta, sinConeAngle, cosConeAngle);
+                float sinTheta0 = sinSubClamped(sinTheta, cosTheta, sinConeAngle, cosConeAngle);
+                // Now we can find the cosine of max(0, (theta - coneAngle) - thetaBoundingCone):
+                float cosThetaPrime = cosSubClamped(sinTheta0, cosTheta0, sinThetaBoundingCone, cosThetaBoundingCone);
+
+                orientationWeight = max(0.f, cosThetaPrime);
+            }
+        }
+
+        // We clamp the distance to the AABB by half its radius, as
+        // "[t]he center of the cluster is not representative of the emitter positions over short distances." -- Conty Estévez and Kulla, Importance Sampling of Many Lights with Adaptive Tree Splitting.
+        float halfRadius = max(nodeAttribs.extent.x, max(nodeAttribs.extent.y, nodeAttribs.extent.z));
+        distance = max(halfRadius, distance);
+
+        return (flux * NdotL) * orientationWeight / (distance * distance);
     }
+
+   
 
 
     /** Traverses the TLAS to select a BLAS to sample.
@@ -351,8 +358,8 @@ struct LightBVHSampler : IEmissiveLightSampler
             uint leftNodeIndex = TLASNode + 1;
             uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
 
-            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
-            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+            float leftNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
 
             float totalImportance = leftNodeImportance + rightNodeImportance;
 
@@ -404,8 +411,8 @@ struct LightBVHSampler : IEmissiveLightSampler
             uint leftNodeIndex = BLASNode + 1;
             uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
 
-            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
-            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+            float leftNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
 
             float totalImportance = leftNodeImportance + rightNodeImportance;
 
@@ -486,7 +493,7 @@ struct LightBVHSampler : IEmissiveLightSampler
     */
     bool pickTriangle(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex, const float u, out float pdf, out uint triangleIndex)
     {
-        const LeafNode node = _lightBVH.getLeafNode(nodeIndex);
+        const LeafNode node = _lightBVH.getLeafBLASNode(nodeIndex);
 
         if (kUseUniformTriangleSampling)
         {
@@ -624,8 +631,8 @@ struct LightBVHSampler : IEmissiveLightSampler
             uint leftNodeIndex = TLASNode + 1;
             uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
 
-            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
-            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+            float leftNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
 
             float totalImportance = leftNodeImportance + rightNodeImportance;
             if (totalImportance == 0.f) return 0.0f;
@@ -665,8 +672,8 @@ struct LightBVHSampler : IEmissiveLightSampler
             uint leftNodeIndex = BLASNode + 1;
             uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
 
-            float leftNodeImportance = computeImportance(posW, normalW, upperHemisphere, leftNodeIndex);
-            float rightNodeImportance = computeImportance(posW, normalW, upperHemisphere, rightNodeIndex);
+            float leftNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
+            float rightNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
 
             float totalImportance = leftNodeImportance + rightNodeImportance;
             if (totalImportance == 0.f) return 0.0f;

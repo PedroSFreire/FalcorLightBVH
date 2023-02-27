@@ -152,7 +152,7 @@ namespace Falcor
         ComputePass::SharedPtr                mInternalUpdater;         ///< Compute pass for refitting internal nodes.
 
         // CPU resources
-        mutable std::vector<PackedNode>       mNodes;                   ///< CPU-side copy of packed BVH nodes.
+
         mutable std::vector<PackedNode>       mTLAS;                   ///< CPU-side copy of packed TLAS nodes.
         mutable std::vector<PackedNode>       mBLAS;      ///< CPU-side copy of packed BLASes nodes per light.
         mutable std::vector<uint32_t>         lightNodeIndices;             ///< Array of first triangle indices of each light.
