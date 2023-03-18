@@ -63,7 +63,7 @@ namespace Falcor
         */
         struct Options
         {
-            SplitHeuristic splitHeuristicSelection = SplitHeuristic::Equal; ///< Which splitting heuristic to use when building.
+            SplitHeuristic splitHeuristicSelection = SplitHeuristic::BinnedSAOH; ///< Which splitting heuristic to use when building.
             uint32_t       maxTriangleCountPerLeaf = 10;                         ///< How many triangles to store at most per leaf node.
             uint32_t       binCount = 16;                                        ///< How many bins to use when building the BVH.
             float          volumeEpsilon = 1e-3f;                                ///< If a node has an AABB which is 0 along one (or more) of its dimensions, use this epsilon instead for that dimension. Only used when 'useVolumeOverSA' is enabled.
@@ -209,7 +209,7 @@ namespace Falcor
             \return Direction of the lighting cone.
         */
         static float3 computeLightingCone(const Range& triangleRange, const BuildingData& data, float& cosTheta);
-
+        static float3 computeLightingConeLights(const Range& lightRange, const BuildingData& data, float& cosTheta);
         // See the documentation of SplitHeuristicFunction.
         static SplitResult computeSplitWithEqual(const BuildingData& /*data*/, const Range& triangleRange, const AABB& nodeBounds, const Options& /*parameters*/);
         static SplitResult computeSplitWithBinnedSAH(const BuildingData& data, const Range& triangleRange, const AABB& nodeBounds, const Options& parameters);

@@ -34,18 +34,78 @@ cbuffer CB
 {
     LightCollection         gLights;            ///< The light sources.
     RWLightBVH              gLightBVH;          ///< The BVH around the light sources.
-    //StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
+    StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
     uint                    gFirstNodeOffset;   ///< The offset of the first node index in 'gNodeIndices' to be processed.
     uint                    gNodeCount;         ///< Amount of nodes that need to be processed.
 };
 
+
+
+
+
+
+
+[numthreads(256, 1, 1)]
+void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
+{
+    if (DTid.x >= gNodeCount) return;
+
+    uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
+    LeafNode node = gLightBVH.getBLASLeafNode(nodeIndex);
+
+    // Update the node bounding box.
+    float3 aabbMin = float3(FLT_MAX);
+    float3 aabbMax = float3(-FLT_MAX);
+    float3 normalsSum = float3(0.0f);
+
+    for (uint i = 0; i < node.triangleCount; i++)
+    {
+        uint triangleIndex = gLightBVH.getNodeTriangleIndex(node, i);
+        EmissiveTriangle tri = gLights.getTriangle(triangleIndex);
+        for (uint vertexIndex = 0u; vertexIndex < 3u; ++vertexIndex)
+        {
+            aabbMin = min(aabbMin, tri.posW[vertexIndex]);
+            aabbMax = max(aabbMax, tri.posW[vertexIndex]);
+        }
+        normalsSum += tri.normal;
+    }
+
+    node.attribs.setAABB(aabbMin, aabbMax);
+
+    // Update the normal bounding cone.
+    float coneDirectionLength = length(normalsSum);
+    float3 coneDirection = normalsSum / coneDirectionLength;
+    float cosConeAngle = kInvalidCosConeAngle;
+
+    if (coneDirectionLength >= FLT_MIN)
+    {
+        cosConeAngle = 1.0f;
+        for (uint i = 0; i < node.triangleCount; i++)
+        {
+            uint triangleIndex = gLightBVH.getNodeTriangleIndex(node, i);
+            float3 normal = gLights.getTriangle(triangleIndex).normal;
+            float cosDiffAngle = dot(coneDirection, normal);
+            cosConeAngle = min(cosConeAngle, cosDiffAngle);
+        }
+        cosConeAngle = max(cosConeAngle, -1.f); // Guard against numerical errors
+    }
+
+    node.attribs.cosConeAngle = cosConeAngle;
+    node.attribs.coneDirection = coneDirection;
+
+    // Store the updated node.
+    gLightBVH.setLeafNode(nodeIndex, node);
+}
+
+
+
 /** Compute shader for refitting the leaf nodes.
     The code assumes a leaf stores an indexed list of emissive triangles.
 */
-[numthreads(256, 1, 1)]
+/*[numthreads(256, 1, 1)]
 void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    /*if (DTid.x >= gNodeCount) return;
+    if (DTid.x >= gNodeCount) return;
 
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
     LeafNode node = gLightBVH.getLeafNode(nodeIndex);
@@ -91,9 +151,9 @@ void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
     node.attribs.coneDirection = coneDirection;
 
     // Store the updated node.
-    gLightBVH.setLeafNode(nodeIndex, node);*/
+    gLightBVH.setLeafNode(nodeIndex, node);
 }
-
+*/
 // Returns sin(a) based on cos(a) for a in [0,pi].
 float sinFromCos(float cosAngle)
 {

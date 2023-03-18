@@ -356,7 +356,7 @@ struct LightBVHSampler : IEmissiveLightSampler
         while (!isLeaf)
         {
             uint leftNodeIndex = TLASNode + 1;
-            uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
+            uint rightNodeIndex = _lightBVH.getTLASInternalNode(TLASNode).rightChildIdx;
 
             float leftNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
             float rightNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
@@ -402,14 +402,14 @@ struct LightBVHSampler : IEmissiveLightSampler
 
     bool traverseBLAS(const float3 posW, const float3 normalW, const bool upperHemisphere, uint TLASNode, inout float u, inout float pdf, out uint BLASNode)
     {
-        BLASNode = _lightBVH.getLeafTLASNode(TLASNode).triangleOffset;
+        BLASNode = _lightBVH.getTLASLeafNode(TLASNode).triangleOffset;
         bool isLeaf = _lightBVH.isBLASLeaf(BLASNode);
 
 
         while (!isLeaf)
         {
             uint leftNodeIndex = BLASNode + 1;
-            uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
+            uint rightNodeIndex = _lightBVH.getBLASInternalNode(BLASNode).rightChildIdx;
 
             float leftNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
             float rightNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
@@ -493,7 +493,7 @@ struct LightBVHSampler : IEmissiveLightSampler
     */
     bool pickTriangle(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex, const float u, out float pdf, out uint triangleIndex)
     {
-        const LeafNode node = _lightBVH.getLeafBLASNode(nodeIndex);
+        const LeafNode node = _lightBVH.getBLASLeafNode(nodeIndex);
 
         if (kUseUniformTriangleSampling)
         {
@@ -548,7 +548,7 @@ struct LightBVHSampler : IEmissiveLightSampler
     */
     bool pickBLASTriangle(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint nodeIndex, const float u, out float pdf, out uint triangleIndex)
     {
-        const LeafNode node = _lightBVH.getLeafBLASNode(nodeIndex);
+        const LeafNode node = _lightBVH.getBLASLeafNode(nodeIndex);
 
         if (kUseUniformTriangleSampling)
         {
@@ -629,7 +629,7 @@ struct LightBVHSampler : IEmissiveLightSampler
         while (!isLeaf)
         {
             uint leftNodeIndex = TLASNode + 1;
-            uint rightNodeIndex = _lightBVH.getInternalTLASNode(TLASNode).rightChildIdx;
+            uint rightNodeIndex = _lightBVH.getTLASInternalNode(TLASNode).rightChildIdx;
 
             float leftNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
             float rightNodeImportance = computeTLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
@@ -664,13 +664,13 @@ struct LightBVHSampler : IEmissiveLightSampler
 
     float evalBLASTraversalPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, uint64_t lightBitmask,float traversalPdf, uint TLASNode , out uint BLASNode)
     {
-        BLASNode = _lightBVH.getLeafTLASNode(TLASNode).triangleOffset;
+        BLASNode = _lightBVH.getTLASLeafNode(TLASNode).triangleOffset;
         bool isLeaf = _lightBVH.isBLASLeaf(BLASNode);
         
         while (!isLeaf)
         {
             uint leftNodeIndex = BLASNode + 1;
-            uint rightNodeIndex = _lightBVH.getInternalBLASNode(BLASNode).rightChildIdx;
+            uint rightNodeIndex = _lightBVH.getBLASInternalNode(BLASNode).rightChildIdx;
 
             float leftNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, leftNodeIndex);
             float rightNodeImportance = computeBLASImportance(posW, normalW, upperHemisphere, rightNodeIndex);
@@ -710,7 +710,7 @@ struct LightBVHSampler : IEmissiveLightSampler
     */
     float evalNodeSamplingPdf(const float3 posW, const float3 normalW, const bool upperHemisphere, const uint leafBLASIndex, const uint triangleIndex)
     {
-        const LeafNode node = _lightBVH.getLeafBLASNode(leafBLASIndex);
+        const LeafNode node = _lightBVH.getBLASLeafNode(leafBLASIndex);
 
         if (kUseUniformTriangleSampling)
         {

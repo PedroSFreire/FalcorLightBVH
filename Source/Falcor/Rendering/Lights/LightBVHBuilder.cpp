@@ -296,7 +296,7 @@ namespace Falcor
                 data.lightsData.push_back(lightsData[i]);
             }
         }
-
+        bvh.mNumLights = lights.size();
         
 
         // If there are no non-culled triangles, we're done.
@@ -344,9 +344,9 @@ namespace Falcor
         SplitHeuristicFunction TLASSplitFunc = TLASgetSplitFunction(mOptions.splitHeuristicSelection);
         SplitHeuristicFunction splitFunc = getSplitFunction(mOptions.splitHeuristicSelection);
         //buildInternal(mOptions, splitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.trianglesData.size())), data);
-        TLASBuildInternal(mOptions, splitFunc, TLASSplitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.lightsData.size())), data);
+         TLASBuildInternal(mOptions, splitFunc, TLASSplitFunc, 0ull, 0, Range(0, static_cast<uint32_t>(data.lightsData.size())), data);
 
-        InternalNode n = {};
+
 
 
         //size_t numValid = 0;
@@ -466,7 +466,8 @@ namespace Falcor
                 // the root node to each leaf node in the tree, which is necessary for pdf computation with MIS.
                 throw RuntimeError("BVH depth of {} reached. Maximum of {} allowed.", depth + 1, kMaxBVHDepth);
             }
-
+            if (lightRange.begin > splitResult.index || splitResult.index > lightRange.end)
+                printf("1\n\n");
             uint32_t leftIndex = TLASBuildInternal(options, SLsplitHeuristic, TLASsplitHeuristic, lightBitmask | (0ull << depth), depth + 1, Range(lightRange.begin, splitResult.index), data);
             uint32_t rightIndex = TLASBuildInternal(options, SLsplitHeuristic, TLASsplitHeuristic, lightBitmask | (1ull << depth),  depth + 1, Range(splitResult.index, lightRange.end), data);
 
@@ -507,6 +508,8 @@ namespace Falcor
             //FALCOR_ASSERT(data.triangleIndices.size() == node.triangleOffset + node.triangleCount);
             
             data.lightNodeIndices[data.lightsData[lightRange.begin].lightIndex] = data.BLAS.size();
+            if (data.lightsData[lightRange.begin].firstTriangleIndex > data.lightsData[lightRange.begin].firstTriangleIndex + data.lightsData[lightRange.begin].triangleCount)
+                printf("2\n\n");
             BLASBuildInternal(options,SLsplitHeuristic, 0ull, 0, Range(data.lightsData[lightRange.begin].firstTriangleIndex, data.lightsData[lightRange.begin].firstTriangleIndex + data.lightsData[lightRange.begin].triangleCount),data, data.lightsData[lightRange.begin].lightIndex);
 
             data.TLAS[nodeIndex].setLeafNode(node);
@@ -561,6 +564,10 @@ namespace Falcor
                throw RuntimeError("BVH depth of {} reached. Maximum of {} allowed.", depth + 1, kMaxBVHDepth);
            }
            FALCOR_ASSERT(splitResult.index < triangleRange.end);
+           if (triangleRange.begin > splitResult.index)
+               printf("3\n\n");
+           if (splitResult.index > triangleRange.end)
+               printf("4\n\n");
            uint32_t leftIndex = BLASBuildInternal(options, splitHeuristic, bitmask | (0ull << depth), depth + 1, Range(triangleRange.begin, splitResult.index), data, lightId);
            uint32_t rightIndex = BLASBuildInternal(options, splitHeuristic, bitmask | (1ull << depth), depth + 1, Range(splitResult.index, triangleRange.end), data, lightId);
 
@@ -630,6 +637,36 @@ namespace Falcor
             {
                 const TriangleSortData& td = data.trianglesData[triangleIdx];
                 cosTheta = computeCosConeAngle(coneDirection, cosTheta, td.coneDirection, td.cosConeAngle);
+            }
+        }
+        return coneDirection;
+    }
+
+
+    float3 LightBVHBuilder::computeLightingConeLights(const Range& lightRange, const BuildingData& data, float& cosTheta)
+    {
+        float3 coneDirection = float3(0.0f);
+        cosTheta = kInvalidCosConeAngle;
+
+        // We use the average normal as cone direction and grow the cone to include all light normals.
+        // TODO: Switch to a more sophisticated algorithm to compute tighter bounding cones.
+        float3 coneDirectionSum = float3(0.0f);
+        for (uint32_t lightIdx = lightRange.begin; lightIdx < lightRange.end; ++lightIdx)
+        {
+            for(uint32_t triangleIdx = data.lightsData[lightIdx].firstTriangleIndex; triangleIdx < data.lightsData[lightIdx].firstTriangleIndex + data.lightsData[lightIdx].triangleCount; triangleIdx++)
+                coneDirectionSum += data.trianglesData[triangleIdx].coneDirection;
+        }
+        if (glm::length(coneDirectionSum) >= FLT_MIN)
+        {
+            coneDirection = glm::normalize(coneDirectionSum);
+            cosTheta = 1.f;
+            for (uint32_t lightIdx = lightRange.begin; lightIdx < lightRange.end; ++lightIdx)
+            {
+                for (uint32_t triangleIdx = data.lightsData[lightIdx].firstTriangleIndex; triangleIdx < data.lightsData[lightIdx].firstTriangleIndex + data.lightsData[lightIdx].triangleCount; triangleIdx++)
+                {
+                    const TriangleSortData& td = data.trianglesData[triangleIdx];
+                    cosTheta = computeCosConeAngle(coneDirection, cosTheta, td.coneDirection, td.cosConeAngle);
+                }
             }
         }
         return coneDirection;
@@ -983,7 +1020,7 @@ namespace Falcor
         // If we couldn't find a valid split, create leaf node immediately if possible or revert to equal splitting.
         if (!overallBestSplit.second.isValid())
         {
-            if (lightRange.length() <= parameters.maxTriangleCountPerLeaf) return SplitResult();
+            if (lightRange.length() == 1) return SplitResult();
             logWarning("LightBVHBuilder::computeSplitWithBinnedSAH() was not able to compute a proper split: reverting to LightBVHBuilder::computeSplitWithEqual()");
             return TLAScomputeSplitWithEqual(data, lightRange, nodeBounds, parameters);
         }
@@ -1388,7 +1425,7 @@ namespace Falcor
         // If we couldn't find a valid split, create leaf node immediately if possible or revert to equal splitting.
         if (!overallBestSplit.second.isValid())
         {
-            if (lightRange.length() <= parameters.maxTriangleCountPerLeaf) return SplitResult();
+            if (lightRange.length() == 1) return SplitResult();
             logWarning("LightBVHBuilder::computeSplitWithBinnedSAOH() was not able to compute a proper split: reverting to LightBVHBuilder::computeSplitWithEqual()");
             return TLAScomputeSplitWithEqual(data, lightRange, nodeBounds, parameters);
         }
@@ -1400,7 +1437,8 @@ namespace Falcor
             
             // Evaluate the cost metric for the node. This requires us to first compute the cone angle.
             float cosTheta = kInvalidCosConeAngle;
-            computeLightingCone(Range(data.lightsData[lightRange.begin].firstTriangleIndex, data.lightsData[lightRange.end-1].firstTriangleIndex + data.lightsData[lightRange.end - 1].triangleCount), data, cosTheta);
+
+            computeLightingConeLights(Range(lightRange.begin, lightRange.end), data, cosTheta);
             float leafCost = evalSAOH(nodeBounds, data.currentNodeFlux, cosTheta, parameters);
             if (leafCost <= overallBestSplit.first) return SplitResult();
         }

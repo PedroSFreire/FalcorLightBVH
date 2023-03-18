@@ -50,21 +50,21 @@ struct LightBVH
     {
         return BLAS[nodeIndex].isLeaf();
     }
-    LeafNode getLeafTLASNode(uint nodeIndex)
+    LeafNode getTLASLeafNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getLeafNode();
     }
 
-    LeafNode getLeafBLASNode(uint nodeIndex)
+    LeafNode getBLASLeafNode(uint nodeIndex)
     {
         return BLAS[nodeIndex].getLeafNode();
     }
-    InternalNode getInternalTLASNode(uint nodeIndex)
+    InternalNode getTLASInternalNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getInternalNode();
     }
 
-    InternalNode getInternalBLASNode(uint nodeIndex)
+    InternalNode getBLASInternalNode(uint nodeIndex)
     {
         return BLAS[nodeIndex].getInternalNode();
     }
@@ -111,21 +111,21 @@ struct RWLightBVH
     {
         return BLAS[nodeIndex].isLeaf();
     }
-    LeafNode getLeafTLASNode(uint nodeIndex)
+    LeafNode getTLASLeafNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getLeafNode();
     }
 
-    LeafNode getLeafBLASNode(uint nodeIndex)
+    LeafNode getBLASLeafNode(uint nodeIndex)
     {
         return BLAS[nodeIndex].getLeafNode();
     }
-    InternalNode getInternalTLASNode(uint nodeIndex)
+    InternalNode getTLASInternalNode(uint nodeIndex)
     {
         return TLAS[nodeIndex].getInternalNode();
     }
 
-    InternalNode getInternalBLASNode(uint nodeIndex)
+    InternalNode getBLASInternalNode(uint nodeIndex)
     {
         return BLAS[nodeIndex].getInternalNode();
     }

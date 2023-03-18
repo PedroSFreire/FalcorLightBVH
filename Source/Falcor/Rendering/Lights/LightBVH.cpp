@@ -42,46 +42,100 @@ namespace Falcor
         return SharedPtr(new LightBVH(pLightCollection));
     }
 
+
+    void LightBVH::TLASrefit(RenderContext* pRenderContext)
+    {
+        // Update all  TLAS leaf nodes.
+        {
+            auto var = mTLASLeafUpdater->getVars()["CB"];
+            mpLightCollection->setShaderData(var["gLights"]);
+            setShaderData(var["gLightBVH"]);
+            var["gNodeIndices"] = mpTLASIndicesBuffer;
+
+            const uint32_t nodeCount = mPerDepthTLASRefitEntryInfo.back().count;
+            FALCOR_ASSERT(nodeCount > 0);
+            var["gFirstNodeOffset"] = mPerDepthTLASRefitEntryInfo.back().offset;
+            var["gNodeCount"] = nodeCount;
+
+            mTLASLeafUpdater->execute(pRenderContext, nodeCount, 1, 1);
+        }
+
+        // Update all TLAS internal nodes.
+        {
+            auto var = mTLASInternalUpdater->getVars()["CB"];
+            mpLightCollection->setShaderData(var["gLights"]);
+            setShaderData(var["gLightBVH"]);
+            var["gNodeIndices"] = mpTLASIndicesBuffer;
+
+            // Note that mBVHStats.treeHeight may be 0, in which case there is a single leaf and no internal nodes.
+            for (int depth = (int)mBVHStats.TLASHeight - 1; depth >= 0; --depth)
+            {
+                const uint32_t nodeCount = mPerDepthTLASRefitEntryInfo[depth].count;
+                FALCOR_ASSERT(nodeCount > 0);
+                var["gFirstNodeOffset"] = mPerDepthTLASRefitEntryInfo[depth].offset;
+                var["gNodeCount"] = nodeCount;
+
+                mTLASInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
+            }
+        }
+
+    }
+
+
+    void LightBVH::BLASrefit(RenderContext* pRenderContext, uint32_t lightId)
+    {
+        // Update all BLAS leaf nodes.
+        {
+            auto var = mBLASLeafUpdater->getVars()["CB"];
+            mpLightCollection->setShaderData(var["gLights"]);
+            setShaderData(var["gLightBVH"]);
+            var["gNodeIndices"] = mpBLASIndicesBuffer[lightId];
+
+            const uint32_t nodeCount = mPerDepthBLASRefitEntryInfo[lightId].back().count;
+            FALCOR_ASSERT(nodeCount > 0);
+            var["gFirstNodeOffset"] = mPerDepthBLASRefitEntryInfo[lightId].back().offset;
+            var["gNodeCount"] = nodeCount;
+
+            mBLASLeafUpdater->execute(pRenderContext, nodeCount, 1, 1);
+        }
+
+        // Update all BLAS internal nodes.
+        {
+            auto var = mBLASInternalUpdater->getVars()["CB"];
+            mpLightCollection->setShaderData(var["gLights"]);
+            setShaderData(var["gLightBVH"]);
+            var["gNodeIndices"] = mpBLASIndicesBuffer[lightId];
+
+            // Note that mBVHStats.treeHeight may be 0, in which case there is a single leaf and no internal nodes.
+            for (int depth = (int)mBVHStats.BLASHeight[lightId] - 1; depth >= 0; --depth)
+            {
+                const uint32_t nodeCount = mPerDepthBLASRefitEntryInfo[lightId][depth].count;
+                FALCOR_ASSERT(nodeCount > 0);
+                var["gFirstNodeOffset"] = mPerDepthBLASRefitEntryInfo[lightId][depth].offset;
+                var["gNodeCount"] = nodeCount;
+
+                mBLASInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
+            }
+        }
+    }
+
+
+
     // TODO: Only update the ones that moved.
     void LightBVH::refit(RenderContext* pRenderContext)
     {
         FALCOR_PROFILE("LightBVH::refit()");
 
         FALCOR_ASSERT(mIsValid);
-
-        // Update all leaf nodes.
-        {
-            auto var = mLeafUpdater->getVars()["CB"];
-            mpLightCollection->setShaderData(var["gLights"]);
-            setShaderData(var["gLightBVH"]);
-            var["gNodeIndices"] = mpNodeIndicesBuffer;
-
-            const uint32_t nodeCount = mPerDepthRefitEntryInfo.back().count;
-            FALCOR_ASSERT(nodeCount > 0);
-            var["gFirstNodeOffset"] = mPerDepthRefitEntryInfo.back().offset;
-            var["gNodeCount"] = nodeCount;
-
-            mLeafUpdater->execute(pRenderContext, nodeCount, 1, 1);
+        bool updated = false;
+        for (uint32_t i; i < mNumLights; i++) {
+            /*if(lightneedsrefit(i)){*/
+            BLASrefit(pRenderContext, i);
+            updated = true;
+            //}
         }
-
-        // Update all internal nodes.
-        {
-            auto var = mInternalUpdater->getVars()["CB"];
-            mpLightCollection->setShaderData(var["gLights"]);
-            setShaderData(var["gLightBVH"]);
-            var["gNodeIndices"] = mpNodeIndicesBuffer;
-
-            // Note that mBVHStats.treeHeight may be 0, in which case there is a single leaf and no internal nodes.
-            for (int depth = (int)mBVHStats.treeHeight - 1; depth >= 0; --depth)
-            {
-                const uint32_t nodeCount = mPerDepthRefitEntryInfo[depth].count;
-                FALCOR_ASSERT(nodeCount > 0);
-                var["gFirstNodeOffset"] = mPerDepthRefitEntryInfo[depth].offset;
-                var["gNodeCount"] = nodeCount;
-
-                mInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
-            }
-        }
+        if(updated)
+            TLASrefit(pRenderContext);
 
         mIsCpuDataValid = false;
     }
@@ -89,37 +143,38 @@ namespace Falcor
     void LightBVH::renderUI(Gui::Widgets& widget)
     {
         // Render the BVH stats.
-        renderStats(widget, getStats());
+        //renderStats(widget, getStats());
     }
 
     void LightBVH::renderStats(Gui::Widgets& widget, const BVHStats& stats) const
     {
         const std::string statsStr =
-            "  Tree height:         " + std::to_string(stats.treeHeight) + "\n" +
-            "  Min depth:           " + std::to_string(stats.minDepth) + "\n" +
-            "  Size:                " + std::to_string(stats.byteSize) + " bytes\n" +
-            "  Internal node count: " + std::to_string(stats.internalNodeCount) + "\n" +
-            "  Leaf node count:     " + std::to_string(stats.leafNodeCount) + "\n" +
-            "  Triangle count:      " + std::to_string(stats.triangleCount) + "\n";
+            "  TLAS height:                 " + std::to_string(stats.TLASHeight) + "\n" +
+            "  TLAS Min depth:              " + std::to_string(stats.minTLASDepth) + "\n" +
+            "  TLAS Size:                   " + std::to_string(stats.TLASByteSize) + " bytes\n" +
+            "  BLAS Collective Size:        " + std::to_string(stats.BLASByteSize) + " bytes\n" +
+            "  TLAS Internal node count:    " + std::to_string(stats.TLASInternalNodeCount) + "\n" +
+            "  TLAS Leaf node count:        " + std::to_string(stats.TLASLeafNodeCount) + "\n" +
+            "  TLAS Triangle count:         " + std::to_string(stats.TLASTriangleCount) + "\n";
         widget.text(statsStr);
 
-        if (auto nodeGroup = widget.group("Node count per level"))
+        if (auto nodeGroup = widget.group("TLAS count per level"))
         {
             std::string countStr;
-            for (uint32_t level = 0; level < stats.nodeCountPerLevel.size(); ++level)
+            for (uint32_t level = 0; level < stats.TLASNodeCountPerLevel.size(); ++level)
             {
-                countStr += "  Node count at level " + std::to_string(level) + ": " + std::to_string(stats.nodeCountPerLevel[level]) + "\n";
+                countStr += "  Node count at level " + std::to_string(level) + ": " + std::to_string(stats.TLASNodeCountPerLevel[level]) + "\n";
             }
             if (!countStr.empty()) countStr.pop_back();
             nodeGroup.text(countStr);
         }
 
-        if (auto leafGroup = widget.group("Leaf node count histogram for triangle counts"))
+        if (auto leafGroup = widget.group("TLAS Leaf node count histogram for triangle counts"))
         {
             std::string countStr;
-            for (uint32_t triangleCount = 0; triangleCount < stats.leafCountPerTriangleCount.size(); ++triangleCount)
+            for (uint32_t triangleCount = 0; triangleCount < stats.TLASLeafCountPerTriangleCount.size(); ++triangleCount)
             {
-                countStr += "  Leaf nodes with " + std::to_string(triangleCount) + " triangles: " + std::to_string(stats.leafCountPerTriangleCount[triangleCount]) + "\n";
+                countStr += "  Leaf nodes with " + std::to_string(triangleCount) + " triangles: " + std::to_string(stats.TLASLeafCountPerTriangleCount[triangleCount]) + "\n";
             }
             if (!countStr.empty()) countStr.pop_back();
             leafGroup.text(countStr);
@@ -131,8 +186,8 @@ namespace Falcor
         // Reset all CPU data.
         mTLAS.clear();
         mBLAS.clear();
-
-        mPerDepthRefitEntryInfo.clear();
+        mPerDepthTLASRefitEntryInfo.clear();
+        mPerDepthBLASRefitEntryInfo.clear();
         mMaxTriangleCountPerLeaf = 0;
         mBVHStats = BVHStats();
         mIsValid = false;
@@ -141,19 +196,23 @@ namespace Falcor
 
     LightBVH::LightBVH(const LightCollection::SharedConstPtr& pLightCollection) : mpLightCollection(pLightCollection)
     {
-        mLeafUpdater = ComputePass::create(kShaderFile, "updateLeafNodes");
-        mInternalUpdater = ComputePass::create(kShaderFile, "updateInternalNodes");
+        // TODO         add blas and tlas 2 to 4 function since leafs are diferent but internals may be the same
+        mBLASLeafUpdater = ComputePass::create(kShaderFile, "updateBLASLeafNodes");
+        mBLASInternalUpdater = ComputePass::create(kShaderFile, "updateBLASInternalNodes");
+        mTLASLeafUpdater = ComputePass::create(kShaderFile, "updateTLASLeafNodes");
+        mTLASInternalUpdater = ComputePass::create(kShaderFile, "updateTLASInternalNodes"); 
     }
 
-    void LightBVH::traverseBVH(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t rootNodeIndex)
+
+    void LightBVH::traverseTLAS(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t rootNodeIndex)
     {
-        /*std::stack<NodeLocation> stack({NodeLocation{rootNodeIndex, 0}});
+        std::stack<NodeLocation> stack({NodeLocation{rootNodeIndex, 0}});
         while (!stack.empty())
         {
             const NodeLocation location = stack.top();
             stack.pop();
 
-            if (mNodes[location.nodeIndex].isLeaf())
+            if (mTLAS[location.nodeIndex].isLeaf())
             {
                 if (!evalLeaf(location)) break;
             }
@@ -162,121 +221,274 @@ namespace Falcor
                 if (!evalInternal(location)) break;
 
                 // Push the children nodes onto the stack.
-                auto node = mNodes[location.nodeIndex].getInternalNode();
+                auto node = mTLAS[location.nodeIndex].getInternalNode();
                 stack.push(NodeLocation{ location.nodeIndex + 1, location.depth + 1 });
                 stack.push(NodeLocation{ node.rightChildIdx, location.depth + 1 });
             }
-        }*/
+        }
+    }
+
+
+    void LightBVH::traverseBLAS(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t lightId)
+    {
+        std::stack<NodeLocation> stack({ NodeLocation{lightNodeIndices[lightId], 0} });
+        while (!stack.empty())
+        {
+            const NodeLocation location = stack.top();
+            stack.pop();
+
+            if (mBLAS[location.nodeIndex].isLeaf())
+            {
+                if (!evalLeaf(location)) break;
+            }
+            else
+            {
+                if (!evalInternal(location)) break;
+
+                // Push the children nodes onto the stack.
+                auto node = mBLAS[location.nodeIndex].getInternalNode();
+                stack.push(NodeLocation{ location.nodeIndex + 1, location.depth + 1 });
+                stack.push(NodeLocation{ node.rightChildIdx, location.depth + 1 });
+            }
+        }
     }
 
     void LightBVH::finalize()
     {
         // This function is called after BVH build has finished.
-        //computeStats();
-        //updateNodeIndices();
+        computeStats();
+        updateNodeIndices();
     }
 
     void LightBVH::computeStats()
     {
+        mBVHStats.BLASHeight.clear();
+        mBVHStats.BLASHeight.resize(mNumLights);
+        mBVHStats.minBLASDepth.clear();
+        mBVHStats.minBLASDepth.resize(mNumLights);
+        mBVHStats.BLASInternalNodeCount.clear();
+        mBVHStats.BLASInternalNodeCount.resize(mNumLights);
+        mBVHStats.BLASLeafNodeCount.clear();
+        mBVHStats.BLASLeafNodeCount.resize(mNumLights);
+        mBVHStats.BLASTriangleCount.clear();
+        mBVHStats.BLASTriangleCount.resize(mNumLights);
+
+        computeTLASStats();
+        for (uint32_t i = 0; i < mNumLights; i++) {
+            computeBLASStats(i);
+        }
+        mBVHStats.BLASByteSize += (uint32_t)(mBLAS.size() * sizeof(mBLAS[0]));
+        
+    }
+
+    void LightBVH::computeTLASStats()
+    {
         FALCOR_ASSERT(isValid());
-        mBVHStats.nodeCountPerLevel.clear();
-        mBVHStats.nodeCountPerLevel.reserve(32);
+        mBVHStats.TLASNodeCountPerLevel.clear();
+        mBVHStats.TLASNodeCountPerLevel.reserve(32);
 
         FALCOR_ASSERT(mMaxTriangleCountPerLeaf > 0);
-        mBVHStats.leafCountPerTriangleCount.clear();
-        mBVHStats.leafCountPerTriangleCount.resize(mMaxTriangleCountPerLeaf + 1, 0);
+        mBVHStats.TLASLeafCountPerTriangleCount.clear();
+        mBVHStats.TLASLeafCountPerTriangleCount.resize(mMaxTriangleCountPerLeaf + 1, 0);
 
-        mBVHStats.treeHeight = 0;
-        mBVHStats.minDepth = std::numeric_limits<uint32_t>::max();
-        mBVHStats.internalNodeCount = 0;
-        mBVHStats.leafNodeCount = 0;
-        mBVHStats.triangleCount = 0;
+        mBVHStats.TLASHeight = 0;
+        mBVHStats.minTLASDepth = std::numeric_limits<uint32_t>::max();
+        mBVHStats.TLASInternalNodeCount = 0;
+        mBVHStats.TLASLeafNodeCount = 0;
+        mBVHStats.TLASTriangleCount = 0;
 
         auto evalInternal = [&](const NodeLocation& location)
         {
-            if (mBVHStats.nodeCountPerLevel.size() <= location.depth) mBVHStats.nodeCountPerLevel.push_back(1);
-            else ++mBVHStats.nodeCountPerLevel[location.depth];
+            if (mBVHStats.TLASNodeCountPerLevel.size() <= location.depth) mBVHStats.TLASNodeCountPerLevel.push_back(1);
+            else ++mBVHStats.TLASNodeCountPerLevel[location.depth];
 
-            ++mBVHStats.internalNodeCount;
+            ++mBVHStats.TLASInternalNodeCount;
             return true;
         };
         auto evalLeaf = [&](const NodeLocation& location)
         {
-            //const auto node = mNodes[location.nodeIndex].getLeafNode();
+            const auto node = mTLAS[location.nodeIndex].getLeafNode();
 
-            if (mBVHStats.nodeCountPerLevel.size() <= location.depth) mBVHStats.nodeCountPerLevel.push_back(1);
-            else ++mBVHStats.nodeCountPerLevel[location.depth];
+            if (mBVHStats.TLASNodeCountPerLevel.size() <= location.depth) mBVHStats.TLASNodeCountPerLevel.push_back(1);
+            else ++mBVHStats.TLASNodeCountPerLevel[location.depth];
 
-            //++mBVHStats.leafCountPerTriangleCount[node.triangleCount];
-            ++mBVHStats.leafNodeCount;
+            ++mBVHStats.TLASLeafCountPerTriangleCount[node.triangleCount];
+            ++mBVHStats.TLASLeafNodeCount;
 
-            mBVHStats.treeHeight = std::max(mBVHStats.treeHeight, location.depth);
-            mBVHStats.minDepth = std::min(mBVHStats.minDepth, location.depth);
-            //mBVHStats.triangleCount += node.triangleCount;
+            mBVHStats.TLASHeight = std::max(mBVHStats.TLASHeight, location.depth);
+            mBVHStats.minTLASDepth = std::min(mBVHStats.minTLASDepth, location.depth);
+            mBVHStats.TLASTriangleCount += node.triangleCount;
             return true;
         };
         traverseBVH(evalInternal, evalLeaf);
 
-        //mBVHStats.byteSize = (uint32_t)(mNodes.size() * sizeof(mNodes[0]));
+        mBVHStats.TLASByteSize = (uint32_t)(mTLAS.size() * sizeof(mTLAS[0]));
     }
 
-    void LightBVH::updateNodeIndices()
+    void LightBVH::computeBLASStats(uint32_t lightId)
     {
-        // The nodes of the BVH are stored in depth-first order. To simplify the work of the refit kernels,
+
+
+        mBVHStats.BLASHeight[lightId] = 0;
+        mBVHStats.minBLASDepth[lightId] = std::numeric_limits<uint32_t>::max();
+        mBVHStats.BLASInternalNodeCount[lightId] = 0;
+        mBVHStats.BLASLeafNodeCount[lightId] = 0;
+        mBVHStats.BLASTriangleCount[lightId] = 0;
+
+        auto evalInternal = [&](const NodeLocation& location)
+        {
+
+            ++mBVHStats.BLASInternalNodeCount[lightId];
+            return true;
+        };
+        auto evalLeaf = [&](const NodeLocation& location)
+        {
+            const auto node = mBLAS[location.nodeIndex].getLeafNode();
+
+
+            ++mBVHStats.BLASLeafNodeCount[lightId];
+
+            mBVHStats.BLASHeight[lightId] = std::max(mBVHStats.BLASHeight[lightId], location.depth);
+            mBVHStats.minBLASDepth[lightId] = std::min(mBVHStats.minBLASDepth[lightId], location.depth);
+            mBVHStats.BLASTriangleCount[lightId] += node.triangleCount;
+            return true;
+        };
+        traverseBLAS(evalInternal, evalLeaf, lightId);
+    }
+
+
+    void LightBVH::updateTLASIndices()
+    {
+        // The nodes of the TLAS are stored in depth-first order. To simplify the work of the refit kernels,
         // they are first run on all leaf nodes, and then on all internal nodes on a per level basis.
         // In order to do that, we need to compute how many internal nodes are stored at each level.
         FALCOR_ASSERT(isValid());
-        mPerDepthRefitEntryInfo.clear();
-        mPerDepthRefitEntryInfo.resize(mBVHStats.treeHeight + 1);
-        mPerDepthRefitEntryInfo.back().count = mBVHStats.leafNodeCount;
+        mPerDepthTLASRefitEntryInfo.clear();
+        mPerDepthTLASRefitEntryInfo.resize(mBVHStats.TLASHeight + 1);
+        mPerDepthTLASRefitEntryInfo.back().count = mBVHStats.TLASLeafNodeCount;
 
-        traverseBVH(
-            [&](const NodeLocation& location) { ++mPerDepthRefitEntryInfo[location.depth].count; return true; },
+        traverseTLAS(
+            [&](const NodeLocation& location) { ++mPerDepthTLASRefitEntryInfo[location.depth].count; return true; },
             [](const NodeLocation& location) { return true; }
         );
 
-        std::vector<uint32_t> perDepthOffset(mPerDepthRefitEntryInfo.size(), 0);
-        for (std::size_t i = 1; i < mPerDepthRefitEntryInfo.size(); ++i)
+        std::vector<uint32_t> perDepthOffset(mPerDepthTLASRefitEntryInfo.size(), 0);
+        for (std::size_t i = 1; i < mPerDepthTLASRefitEntryInfo.size(); ++i)
         {
-            uint32_t currentOffset = mPerDepthRefitEntryInfo[i - 1].offset + mPerDepthRefitEntryInfo[i - 1].count;
-            perDepthOffset[i] = mPerDepthRefitEntryInfo[i].offset = currentOffset;
+            uint32_t currentOffset = mPerDepthTLASRefitEntryInfo[i - 1].offset + mPerDepthTLASRefitEntryInfo[i - 1].count;
+            perDepthOffset[i] = mPerDepthTLASRefitEntryInfo[i].offset = currentOffset;
         }
 
         // For validation purposes
         {
             uint32_t currentOffset = 0;
-            for (const RefitEntryInfo& info : mPerDepthRefitEntryInfo)
+            for (const RefitEntryInfo& info : mPerDepthTLASRefitEntryInfo)
             {
                 FALCOR_ASSERT(info.offset == currentOffset);
                 currentOffset += info.count;
             }
-            FALCOR_ASSERT(currentOffset == (mBVHStats.internalNodeCount + mBVHStats.leafNodeCount));
+            FALCOR_ASSERT(currentOffset == (mBVHStats.TLASInternalNodeCount + mBVHStats.TLASLeafNodeCount));
         }
 
         // Now that we know how many nodes are stored per level (excluding leaf nodes) and how many leaf nodes there are,
         // we can fill in the buffer with all the node indices sorted by tree level. The indices are stored as follows
         // <-- Indices to all internal nodes at level 0 --> | ... | <-- Indices to all internal nodes at level (treeHeight - 1) --> | <-- Indices to all leaf nodes -->
-        mNodeIndices.clear();
-        mNodeIndices.resize(mBVHStats.internalNodeCount + mBVHStats.leafNodeCount, 0);
+        mTLASIndices.clear();
+        mTLASIndices.resize(mBVHStats.TLASInternalNodeCount + mBVHStats.TLASLeafNodeCount, 0);
 
-        traverseBVH(
-            [&](const NodeLocation& location) { mNodeIndices[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },
-            [&](const NodeLocation& location) { mNodeIndices[perDepthOffset.back()++] = location.nodeIndex; return true; }
+        traverseTLAS(
+            [&](const NodeLocation& location) { mTLASIndices[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },
+            [&](const NodeLocation& location) { mTLASIndices[perDepthOffset.back()++] = location.nodeIndex; return true; }
         );
 
-        /*if (!mpNodeIndicesBuffer || mpNodeIndicesBuffer->getElementCount() < mNodeIndices.size())
+        if (!mpTLASIndicesBuffer || mpTLASIndicesBuffer->getElementCount() < mTLASIndices.size())
         {
-            mpNodeIndicesBuffer = Buffer::createStructured(sizeof(uint32_t), (uint32_t)mNodeIndices.size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
-            mpNodeIndicesBuffer->setName("LightBVH::mpNodeIndicesBuffer");
+            mpTLASIndicesBuffer = Buffer::createStructured(sizeof(uint32_t), (uint32_t)mTLASIndices.size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
+            mpTLASIndicesBuffer->setName("LightBVH::mpTLASIndicesBuffer");
         }
 
-        mpNodeIndicesBuffer->setBlob(mNodeIndices.data(), 0, mNodeIndices.size() * sizeof(uint32_t));*/
+        mpTLASIndicesBuffer->setBlob(mTLASIndices.data(), 0, mTLASIndices.size() * sizeof(uint32_t));
+    }
+
+
+
+    void LightBVH::updateBLASIndices(uint32_t lightId)
+    {
+        // The nodes of the TLAS are stored in depth-first order. To simplify the work of the refit kernels,
+        // they are first run on all leaf nodes, and then on all internal nodes on a per level basis.
+        // In order to do that, we need to compute how many internal nodes are stored at each level.
+        FALCOR_ASSERT(isValid());
+        mPerDepthBLASRefitEntryInfo[lightId].clear();
+        mPerDepthBLASRefitEntryInfo[lightId].resize(mBVHStats.BLASHeight[lightId] + 1);
+        mPerDepthBLASRefitEntryInfo[lightId].back().count = mBVHStats.BLASLeafNodeCount[lightId];
+
+        traverseBLAS(
+            [&](const NodeLocation& location) { ++mPerDepthBLASRefitEntryInfo[lightId][location.depth].count; return true; },
+            [](const NodeLocation& location) { return true; },lightId
+        );
+
+        std::vector<uint32_t> perDepthOffset(mPerDepthBLASRefitEntryInfo[lightId].size(), 0);
+        for (std::size_t i = 1; i < mPerDepthBLASRefitEntryInfo[lightId].size(); ++i)
+        {
+            uint32_t currentOffset = mPerDepthBLASRefitEntryInfo[lightId][i - 1].offset + mPerDepthBLASRefitEntryInfo[lightId][i - 1].count;
+            perDepthOffset[i] = mPerDepthBLASRefitEntryInfo[lightId][i].offset = currentOffset;
+        }
+
+        // For validation purposes
+        {
+            uint32_t currentOffset = 0;
+            for (const RefitEntryInfo& info : mPerDepthBLASRefitEntryInfo[lightId])
+            {
+                FALCOR_ASSERT(info.offset == currentOffset);
+                currentOffset += info.count;
+            }
+            FALCOR_ASSERT(currentOffset == (mBVHStats.BLASInternalNodeCount[lightId] + mBVHStats.BLASLeafNodeCount[lightId]));
+        }
+
+        // Now that we know how many nodes are stored per level (excluding leaf nodes) and how many leaf nodes there are,
+        // we can fill in the buffer with all the node indices sorted by tree level. The indices are stored as follows
+        // <-- Indices to all internal nodes at level 0 --> | ... | <-- Indices to all internal nodes at level (treeHeight - 1) --> | <-- Indices to all leaf nodes -->
+        mBLASIndices[lightId].clear();
+        mBLASIndices[lightId].resize(mBVHStats.BLASInternalNodeCount[lightId] + mBVHStats.BLASLeafNodeCount[lightId], 0);
+
+        traverseBLAS(
+            [&](const NodeLocation& location) { mBLASIndices[lightId][perDepthOffset[location.depth]++] = location.nodeIndex; return true; },
+            [&](const NodeLocation& location) { mBLASIndices[lightId][perDepthOffset.back()++] = location.nodeIndex; return true; },lightId
+        );
+
+        if (!mpBLASIndicesBuffer[lightId] || mpBLASIndicesBuffer[lightId]->getElementCount() < mBLASIndices[lightId].size())
+        {
+            mpBLASIndicesBuffer[lightId] = Buffer::createStructured(sizeof(uint32_t), (uint32_t)mBLASIndices[lightId].size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
+            mpBLASIndicesBuffer[lightId]->setName("LightBVH::mpBLASIndicesBuffer");
+        }
+
+        mpBLASIndicesBuffer[lightId]->setBlob(mBLASIndices[lightId].data(), 0, mBLASIndices[lightId].size() * sizeof(uint32_t));
+    }
+
+
+
+    void LightBVH::updateNodeIndices()
+    {
+        mPerDepthBLASRefitEntryInfo.clear();
+        mPerDepthBLASRefitEntryInfo.resize(mNumLights);
+
+        mBLASIndices.clear();
+        mBLASIndices.resize(mNumLights);
+
+        mPerDepthBLASRefitEntryInfo.clear();
+        mpBLASIndicesBuffer.resize(mNumLights);
+
+        updateTLASIndices();
+
+        for(uint32_t i = 0; i < mNumLights; i++) {
+            updateBLASIndices(i);
+        }
     }
 
     void LightBVH::uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks)
     {
         // Reallocate buffers if size requirements have changed.
-        auto var = mLeafUpdater->getRootVar()["CB"]["gLightBVH"];
+        auto var = mBLASLeafUpdater->getRootVar()["CB"]["gLightBVH"];
         
         if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())
         {
@@ -300,13 +512,6 @@ namespace Falcor
         }
 
 
-
-
-
-
-
-
-
         if (!mpLightIndicesBuffer || mpLightIndicesBuffer->getElementCount() < lightIndices.size())
         {
             mpLightIndicesBuffer = Buffer::createStructured(var["lightIndices"], (uint32_t)lightIndices.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
@@ -317,12 +522,6 @@ namespace Falcor
             mpLightBitmasksBuffer = Buffer::createStructured(var["lightBitmasks"], (uint32_t)lightBitmasks.size(), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
             mpLightBitmasksBuffer->setName("LightBVH::mpLightBitmasksBuffer");
         }
-
-
-
-
-
-
 
         // Update our GPU side buffers.
         //FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
