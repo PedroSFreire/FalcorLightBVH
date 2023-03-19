@@ -93,7 +93,7 @@ namespace Falcor
             \param[in] evalLeaf Function called on each leaf node.
             \param[in] rootNodeIndex The index of the node to start traversing.
         */
-        void traverseBVH(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t rootNodeIndex = 0);
+
         void traverseTLAS(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t rootNodeIndex = 0);
         void traverseBLAS(const NodeFunction& evalInternal, const NodeFunction& evalLeaf, uint32_t lightId);
 

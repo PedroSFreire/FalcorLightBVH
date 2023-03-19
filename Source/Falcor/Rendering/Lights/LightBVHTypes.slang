@@ -83,7 +83,7 @@ struct LeafNode
 {
     SharedNodeAttributes attribs;   ///< Shared node attributes (origin/extent, bounding cone, flux).
     uint triangleCount = 0;         ///< Number of triangles stored in leaf node.
-    uint triangleOffset = 0;        ///< Offset into the triangle index list where this node's triangle indices are stored.
+    uint triangleOffset = 0;        ///< Offset into the triangle index list where this node's triangle indices are stored. In the TLAS it is used as the offset for the blas vector.
 };
 
 /** Light BVH node packed into 32B.

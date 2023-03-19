@@ -128,10 +128,10 @@ namespace Falcor
 
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
-        for (uint32_t i; i < mNumLights; i++) {
+        for (uint32_t i = 0; i < mNumLights; i++) {
             /*if(lightneedsrefit(i)){*/
-            BLASrefit(pRenderContext, i);
-            updated = true;
+            //BLASrefit(pRenderContext, i);
+            //updated = true;
             //}
         }
         if(updated)
@@ -258,6 +258,7 @@ namespace Falcor
         // This function is called after BVH build has finished.
         computeStats();
         updateNodeIndices();
+        printf("did not crash");
     }
 
     void LightBVH::computeStats()
@@ -299,6 +300,7 @@ namespace Falcor
 
         auto evalInternal = [&](const NodeLocation& location)
         {
+
             if (mBVHStats.TLASNodeCountPerLevel.size() <= location.depth) mBVHStats.TLASNodeCountPerLevel.push_back(1);
             else ++mBVHStats.TLASNodeCountPerLevel[location.depth];
 
@@ -320,7 +322,7 @@ namespace Falcor
             mBVHStats.TLASTriangleCount += node.triangleCount;
             return true;
         };
-        traverseBVH(evalInternal, evalLeaf);
+        traverseTLAS(evalInternal, evalLeaf);
 
         mBVHStats.TLASByteSize = (uint32_t)(mTLAS.size() * sizeof(mTLAS[0]));
     }
