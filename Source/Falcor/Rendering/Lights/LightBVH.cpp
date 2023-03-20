@@ -129,9 +129,9 @@ namespace Falcor
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
         for (uint32_t i = 0; i < mNumLights; i++) {
-            /*if(lightneedsrefit(i)){*/
-            //BLASrefit(pRenderContext, i);
-            //updated = true;
+            //if(lightneedsrefit(i)){
+            BLASrefit(pRenderContext, i);
+            updated = true;
             //}
         }
         if(updated)
@@ -169,16 +169,6 @@ namespace Falcor
             nodeGroup.text(countStr);
         }
 
-        if (auto leafGroup = widget.group("TLAS Leaf node count histogram for triangle counts"))
-        {
-            std::string countStr;
-            for (uint32_t triangleCount = 0; triangleCount < stats.TLASLeafCountPerTriangleCount.size(); ++triangleCount)
-            {
-                countStr += "  Leaf nodes with " + std::to_string(triangleCount) + " triangles: " + std::to_string(stats.TLASLeafCountPerTriangleCount[triangleCount]) + "\n";
-            }
-            if (!countStr.empty()) countStr.pop_back();
-            leafGroup.text(countStr);
-        }
     }
 
     void LightBVH::clear()
@@ -258,7 +248,6 @@ namespace Falcor
         // This function is called after BVH build has finished.
         computeStats();
         updateNodeIndices();
-        printf("did not crash");
     }
 
     void LightBVH::computeStats()
@@ -289,8 +278,7 @@ namespace Falcor
         mBVHStats.TLASNodeCountPerLevel.reserve(32);
 
         FALCOR_ASSERT(mMaxTriangleCountPerLeaf > 0);
-        mBVHStats.TLASLeafCountPerTriangleCount.clear();
-        mBVHStats.TLASLeafCountPerTriangleCount.resize(mMaxTriangleCountPerLeaf + 1, 0);
+
 
         mBVHStats.TLASHeight = 0;
         mBVHStats.minTLASDepth = std::numeric_limits<uint32_t>::max();
@@ -300,21 +288,20 @@ namespace Falcor
 
         auto evalInternal = [&](const NodeLocation& location)
         {
-
+ 
             if (mBVHStats.TLASNodeCountPerLevel.size() <= location.depth) mBVHStats.TLASNodeCountPerLevel.push_back(1);
             else ++mBVHStats.TLASNodeCountPerLevel[location.depth];
-
             ++mBVHStats.TLASInternalNodeCount;
             return true;
         };
         auto evalLeaf = [&](const NodeLocation& location)
         {
+
             const auto node = mTLAS[location.nodeIndex].getLeafNode();
 
             if (mBVHStats.TLASNodeCountPerLevel.size() <= location.depth) mBVHStats.TLASNodeCountPerLevel.push_back(1);
             else ++mBVHStats.TLASNodeCountPerLevel[location.depth];
 
-            ++mBVHStats.TLASLeafCountPerTriangleCount[node.triangleCount];
             ++mBVHStats.TLASLeafNodeCount;
 
             mBVHStats.TLASHeight = std::max(mBVHStats.TLASHeight, location.depth);
@@ -471,13 +458,14 @@ namespace Falcor
 
     void LightBVH::updateNodeIndices()
     {
+
         mPerDepthBLASRefitEntryInfo.clear();
         mPerDepthBLASRefitEntryInfo.resize(mNumLights);
 
         mBLASIndices.clear();
         mBLASIndices.resize(mNumLights);
 
-        mPerDepthBLASRefitEntryInfo.clear();
+        mpBLASIndicesBuffer.clear();
         mpBLASIndicesBuffer.resize(mNumLights);
 
         updateTLASIndices();

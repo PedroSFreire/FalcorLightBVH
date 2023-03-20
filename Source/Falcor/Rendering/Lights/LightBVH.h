@@ -102,7 +102,6 @@ namespace Falcor
         struct BVHStats
         {
             std::vector<uint32_t> TLASNodeCountPerLevel;         ///< For each level in the tree, how many nodes are there.
-            std::vector<uint32_t> TLASLeafCountPerTriangleCount; ///< For each amount of triangles, how many leaf nodes contain that many triangles.
 
             uint32_t TLASHeight = 0;                            ///< Number of edges on the longest path between the root node and a leaf.
             std::vector<uint32_t> BLASHeight;                            ///< Number of edges on the longest path between the root node and a leaf.
