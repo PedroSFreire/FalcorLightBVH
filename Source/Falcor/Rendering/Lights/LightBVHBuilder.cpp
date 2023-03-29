@@ -1021,7 +1021,7 @@ namespace Falcor
         if (!overallBestSplit.second.isValid())
         {
             if (lightRange.length() == 1) return SplitResult();
-            logWarning("LightBVHBuilder::computeSplitWithBinnedSAH() was not able to compute a proper split: reverting to LightBVHBuilder::computeSplitWithEqual()");
+            logWarning("LightBVHBuilder::TLAScomputeSplitWithBinnedSAH() was not able to compute a proper split: reverting to LightBVHBuilder::TLAScomputeSplitWithEqual()");
             return TLAScomputeSplitWithEqual(data, lightRange, nodeBounds, parameters);
         }
 
