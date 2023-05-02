@@ -188,7 +188,9 @@ void updateTLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
     uint i = 0;
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
     LeafNode node = gLightBVH.getTLASLeafNode(nodeIndex);
+
     InternalNode childNode = gLightBVH.getBLASInternalNode(node.triangleOffset);
+
     if (childNode.attribs.cosConeAngle != node.attribs.cosConeAngle ||
     childNode.attribs.coneDirection.x  != node.attribs.coneDirection.x  || childNode.attribs.coneDirection.y != node.attribs.coneDirection.y|| childNode.attribs.coneDirection.z != node.attribs.coneDirection.z ||
     childNode.attribs.origin.x != node.attribs.origin.x || childNode.attribs.origin.y != node.attribs.origin.y || childNode.attribs.origin.z != node.attribs.origin.z ||
