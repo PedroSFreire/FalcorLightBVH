@@ -83,7 +83,7 @@ namespace Falcor
 
 
     void LightBVH::BLASrefit(RenderContext* pRenderContext, uint32_t lightId)
-    {
+    {   
         // Update all BLAS leaf nodes.
         {
             auto var = mBLASLeafUpdater->getVars()["CB"];
@@ -128,16 +128,19 @@ namespace Falcor
 
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
-        for (uint32_t i = 0; i < mNumLights; i++) {
-            //if(lightneedsrefit(i)){
-            BLASrefit(pRenderContext, i);
-            updated = true;
-            //}
-        }
-        if(updated)
-            TLASrefit(pRenderContext);
 
-        mIsCpuDataValid = false;
+        for (uint32_t i = 0; i < mpLightCollection->changedLights.size(); i++) {
+            BLASrefit(pRenderContext, mpLightCollection->changedLights[i]);
+            updated = true;
+        }
+        if (updated) {       
+            TLASrefit(pRenderContext);
+            mIsCpuDataValid = false;
+            syncBLASDataToCPU();
+        }
+            
+
+        
     }
 
     void LightBVH::renderUI(Gui::Widgets& widget)
@@ -479,7 +482,17 @@ namespace Falcor
     {
         // Reallocate buffers if size requirements have changed.
         auto var = mBLASLeafUpdater->getRootVar()["CB"]["gLightBVH"];
-        
+               ///< Buffer containing all light id to first triangle BLAS index.
+        if (!mpLightNodeIndicesBuffer || mpLightNodeIndicesBuffer->getElementCount() < lightIndices.size())
+        {
+            mpLightNodeIndicesBuffer = Buffer::createStructured(var["lightNodeIndices"], (uint32_t)lightNodeIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
+            mpLightNodeIndicesBuffer->setName("LightBVH::mpLightNodeIndicesBuffer");
+        }
+        if (!mpBLASChangedRootsBuffer || mpBLASChangedRootsBuffer->getElementCount() < lightIndices.size())
+        {
+            mpBLASChangedRootsBuffer = Buffer::createStructured(var["BLASChangedRoots"], (uint32_t)lightIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
+            mpBLASChangedRootsBuffer->setName("LightBVH::mpBLASChangedRootsBuffer");
+        }
         if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())
         {
             mpTLASNodesBuffer = Buffer::createStructured(var["TLAS"], (uint32_t)mTLAS.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
@@ -518,6 +531,9 @@ namespace Falcor
         //FALCOR_ASSERT(mpBVHNodesBuffer->getStructSize() == sizeof(mNodes[0]));
         //mpBVHNodesBuffer->setBlob(mNodes.data(), 0, mNodes.size() * sizeof(mNodes[0]));
 
+        FALCOR_ASSERT(mpLightNodeIndicesBuffer->getSize() >= lightNodeIndices.size() * sizeof(lightNodeIndices[0]));
+        mpLightNodeIndicesBuffer->setBlob(lightNodeIndices.data(), 0, lightNodeIndices.size() * sizeof(lightNodeIndices[0]));
+
         FALCOR_ASSERT(mpTLASNodesBuffer->getElementCount() >= mTLAS.size());
         FALCOR_ASSERT(mpTLASNodesBuffer->getStructSize() == sizeof(mTLAS[0]));
         mpTLASNodesBuffer->setBlob(mTLAS.data(), 0, mTLAS.size() * sizeof(mTLAS[0]));
@@ -531,6 +547,53 @@ namespace Falcor
 
         FALCOR_ASSERT(mpTriangleBitmasksBuffer->getSize() >= triangleBitmasks.size() * sizeof(triangleBitmasks[0]));
         mpTriangleBitmasksBuffer->setBlob(triangleBitmasks.data(), 0, triangleBitmasks.size() * sizeof(triangleBitmasks[0]));
+
+        FALCOR_ASSERT(mpLightIndicesBuffer->getSize() >= lightIndices.size() * sizeof(lightIndices[0]));
+        mpTriangleIndicesBuffer->setBlob(lightIndices.data(), 0, lightIndices.size() * sizeof(lightIndices[0]));
+
+        FALCOR_ASSERT(mpLightBitmasksBuffer->getSize() >= lightBitmasks.size() * sizeof(lightBitmasks[0]));
+        mpTriangleBitmasksBuffer->setBlob(lightBitmasks.data(), 0, lightBitmasks.size() * sizeof(lightBitmasks[0]));
+
+        mIsCpuDataValid = true;
+    }
+
+
+    void LightBVH::uploadTLASBuffer( const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks)
+    {
+        // Reallocate buffers if size requirements have changed.
+        auto var = mBLASLeafUpdater->getRootVar()["CB"]["gLightBVH"];
+        ///< Buffer containing all light id to first triangle BLAS index.
+        if (!mpLightNodeIndicesBuffer || mpLightNodeIndicesBuffer->getElementCount() < lightIndices.size())
+        {
+            mpLightNodeIndicesBuffer = Buffer::createStructured(var["lightNodeIndices"], (uint32_t)lightNodeIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
+            mpLightNodeIndicesBuffer->setName("LightBVH::mpLightNodeIndicesBuffer");
+        }
+        if (!mpBLASChangedRootsBuffer || mpBLASChangedRootsBuffer->getElementCount() < lightIndices.size())
+        {
+            mpBLASChangedRootsBuffer = Buffer::createStructured(var["BLASChangedRoots"], (uint32_t)lightIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
+            mpBLASChangedRootsBuffer->setName("LightBVH::mpBLASChangedRootsBuffer");
+        }
+        if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())
+        {
+            mpTLASNodesBuffer = Buffer::createStructured(var["TLAS"], (uint32_t)mTLAS.size(), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr, false);
+            mpTLASNodesBuffer->setName("LightBVH::mpTLASNodesBuffer");
+        }
+        // Update our GPU side buffers.
+        //FALCOR_ASSERT(mpBVHNodesBuffer->getElementCount() >= mNodes.size());
+        //FALCOR_ASSERT(mpBVHNodesBuffer->getStructSize() == sizeof(mNodes[0]));
+        //mpBVHNodesBuffer->setBlob(mNodes.data(), 0, mNodes.size() * sizeof(mNodes[0]));
+
+        
+        FALCOR_ASSERT(mpTLASNodesBuffer->getElementCount() >= mTLAS.size());
+        FALCOR_ASSERT(mpTLASNodesBuffer->getStructSize() == sizeof(mTLAS[0]));
+        mpTLASNodesBuffer->setBlob(mTLAS.data(), 0, mTLAS.size() * sizeof(mTLAS[0]));
+
+        FALCOR_ASSERT(mpLightIndicesBuffer->getSize() >= lightIndices.size() * sizeof(lightIndices[0]));
+        mpTriangleIndicesBuffer->setBlob(lightIndices.data(), 0, lightIndices.size() * sizeof(lightIndices[0]));
+
+        FALCOR_ASSERT(mpLightBitmasksBuffer->getSize() >= lightBitmasks.size() * sizeof(lightBitmasks[0]));
+        mpTriangleBitmasksBuffer->setBlob(lightBitmasks.data(), 0, lightBitmasks.size() * sizeof(lightBitmasks[0]));
+
 
         mIsCpuDataValid = true;
     }
@@ -558,12 +621,39 @@ namespace Falcor
         mIsCpuDataValid = true;
     }
 
+
+
+    void LightBVH::syncBLASDataToCPU() const
+    {
+        if (!mIsValid || mIsCpuDataValid) return;
+
+        // TODO: This is slow because of the flush. We should copy to a staging buffer
+        // after the data is updated on the GPU and map the staging buffer here instead.
+        //const void* const ptr = mpBVHNodesBuffer->map(Buffer::MapType::Read);
+        //FALCOR_ASSERT(mNodes.size() > 0 && mNodes.size() <= mpBVHNodesBuffer->getElementCount());
+        //std::memcpy(mNodes.data(), ptr, mNodes.size() * sizeof(mNodes[0]));
+        //mpBVHNodesBuffer->unmap();
+
+        const void* const ptrBLAS = mpBLASChangedRootsBuffer->map(Buffer::MapType::Read);
+        FALCOR_ASSERT(ChangedLights.size() > 0 && ChangedLights.size() <= mpBLASChangedRootsBuffer->getElementCount());
+        std::memcpy(ChangedLights.data(), ptrBLAS, ChangedLights.size() * sizeof(ChangedLights[0]));
+        mpBLASChangedRootsBuffer->unmap();
+
+        float max;
+        max = ChangedLights[124].getLeafNode().attribs.flux;
+        printf("flux of 124 is :%f\n\n", max);
+
+        mIsCpuDataValid = true;
+    }
+
     void LightBVH::setShaderData(const ShaderVar& var) const
     {
         if (isValid())
         {
             FALCOR_ASSERT(var.isValid());
             var["TLAS"] = mpTLASNodesBuffer;
+            var["BLASChangedRoots"] = mpBLASChangedRootsBuffer;
+            var["lightNodeIndices"] = mpLightNodeIndicesBuffer;
             var["BLAS"] = mpBLASNodesBuffer;
             var["triangleIndices"] = mpTriangleIndicesBuffer;
             var["triangleBitmasks"] = mpTriangleBitmasksBuffer;

@@ -39,7 +39,8 @@ struct LightBVH
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
     StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
-
+    StructuredBuffer<PackedNode> BLASChangedRoots;        ///< Buffer containing all changed BLAS roots.
+    StructuredBuffer<uint> lightNodeIndices;        ///< Buffer containing all light id to first triangle BLAS index.
    
     bool isTLASLeaf(uint nodeIndex)
     {
@@ -100,7 +101,8 @@ struct RWLightBVH
     StructuredBuffer<uint2> triangleBitmasks;       ///< Buffer containing for each emissive triangle, a bit mask of the traversal to follow in order to reach that triangle. Size: lights.triangleCount * sizeof(uint64_t).
     StructuredBuffer<uint> lightIndices;            ///< Buffer containing the indices of all lights. Each leaf node refers to a contiguous range of indices.
     StructuredBuffer<uint2> lightBitmasks;          ///< Buffer containing for each emissive light, a bit mask of the traversal to follow in order to reach that light.
-
+    RWStructuredBuffer<PackedNode> BLASChangedRoots;        ///< Buffer containing all changed BLAS roots.
+    StructuredBuffer<uint> lightNodeIndices;        ///< Buffer containing all light id to first triangle BLAS index.
 
     bool isTLASLeaf(uint nodeIndex)
     {
@@ -154,5 +156,10 @@ struct RWLightBVH
     void setBLASInternalNode(uint nodeIndex, InternalNode node)
     {
         BLAS[nodeIndex].setInternalNode(node);
+    }
+
+    void setChangedLightNode(uint nodeIndex, LeafNode node)
+    {
+        BLASChangedRoots[nodeIndex].setLeafNode(node);
     }
 };

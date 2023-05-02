@@ -171,6 +171,7 @@ void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
 
     // Store the updated node.
     gLightBVH.setBLASInternalNode(nodeIndex, node);
+
 }
 
 
@@ -184,25 +185,43 @@ void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
 void updateTLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
     if (DTid.x >= gNodeCount) return;
-
+    uint i = 0;
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
     LeafNode node = gLightBVH.getTLASLeafNode(nodeIndex);
     InternalNode childNode = gLightBVH.getBLASInternalNode(node.triangleOffset);
+    if (childNode.attribs.cosConeAngle != node.attribs.cosConeAngle ||
+    childNode.attribs.coneDirection.x  != node.attribs.coneDirection.x  || childNode.attribs.coneDirection.y != node.attribs.coneDirection.y|| childNode.attribs.coneDirection.z != node.attribs.coneDirection.z ||
+    childNode.attribs.origin.x != node.attribs.origin.x || childNode.attribs.origin.y != node.attribs.origin.y || childNode.attribs.origin.z != node.attribs.origin.z ||
+    childNode.attribs.extent.x != node.attribs.extent.x || childNode.attribs.extent.y != node.attribs.extent.y || childNode.attribs.extent.z != node.attribs.extent.z )
+    {
+        // Update the node bounding box.
+        float3 aabbMin = float3(FLT_MAX);
+        float3 aabbMax = float3(-FLT_MAX);
 
-    // Update the node bounding box.
-    float3 aabbMin = float3(FLT_MAX);
-    float3 aabbMax = float3(-FLT_MAX);
+        childNode.attribs.getAABB(aabbMin, aabbMax);
+        node.attribs.setAABB(aabbMin, aabbMax);
 
-    childNode.attribs.getAABB(aabbMin, aabbMax);
-    node.attribs.setAABB(aabbMin, aabbMax);
+        // Update the normal bounding cone.
 
-    // Update the normal bounding cone.
+        node.attribs.cosConeAngle = childNode.attribs.cosConeAngle;
+        node.attribs.coneDirection = childNode.attribs.coneDirection;
 
-    node.attribs.cosConeAngle = childNode.attribs.cosConeAngle;
-    node.attribs.coneDirection = childNode.attribs.coneDirection;
+        node.attribs.flux = childNode.attribs.flux;
 
-    // Store the updated node.
-    gLightBVH.setTLASLeafNode(nodeIndex, node);
+        // Store the updated node.
+        LeafNode origNode = gLightBVH.getTLASLeafNode(nodeIndex);
+         
+        for(i = 0; i < gLights.meshCount;i++)
+        {
+            if(gLightBVH.lightNodeIndices[i] == node.triangleOffset)
+            {
+                gLightBVH.setChangedLightNode(i,node);
+                break;
+            }
+        }
+        
+        gLightBVH.setTLASLeafNode(nodeIndex, node);
+    }
 }
 
 

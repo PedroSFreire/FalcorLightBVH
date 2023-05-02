@@ -51,6 +51,8 @@ namespace Falcor
         using SharedPtr = std::shared_ptr<LightBVHBuilder>;
         using SharedConstPtr = std::shared_ptr<const LightBVHBuilder>;
 
+
+
         enum class SplitHeuristic : uint32_t
         {
             Equal = 0u,         ///< Split the input into two equal partitions.
@@ -80,6 +82,10 @@ namespace Falcor
             \param[in] options The options to use for building the BVH.
         */
         static SharedPtr create(const Options& options);
+
+        // Re build the TLAS.
+        void LightBVHBuilder::reBuild(LightBVH& bvh);
+
 
         /** Build the BVH.
             \param[in,out] bvh The light BVH to build.
@@ -156,12 +162,14 @@ namespace Falcor
             std::vector<uint64_t> triangleBitmasks;         ///< Array containing the per triangle bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child; this array gets filled in during the build process. Indexed by global triangle index.
             std::vector<uint32_t> BLASTriangleIndices;
             std::vector<uint64_t> BLASTriangleBitmasks;
-            std::vector<uint32_t> lightIndices;          ///< Light indices sorted by leaf node. Each leaf node refers to a contiguous array of light indices.
+            std::vector<uint32_t> lightIndices;          ///< Light indices sorted by leaf node. Each leaf node refers to a light index.
             std::vector<uint64_t> lightBitmasks;         ///< Array containing the per light bit pattern retracing the tree traversal to reach the light: 0=left child, 1=right child; this array gets filled in during the  TLAS build process. Indexed by global triangle index.
             float currentNodeFlux = 0.f;                    ///< Used by computeSAOHSplit() as the leaf creation cost.
 
-            BuildingData( std::vector<PackedNode>& TLASNodes, std::vector<PackedNode>& BLASNodes , std::vector<uint32_t>& lnIndices) : TLAS(TLASNodes), BLAS(BLASNodes), lightNodeIndices(lnIndices){}
+            BuildingData(std::vector<PackedNode>& TLASNodes, std::vector<PackedNode>& BLASNodes, std::vector<uint32_t>& lnIndices) : TLAS(TLASNodes), BLAS(BLASNodes), lightNodeIndices(lnIndices) {}
         };
+
+        std::vector<LightSortData> refitLightData;
 
         /** Compute the split according to a specified heuristic.
             \param[in] data Prepared light data.
@@ -188,6 +196,8 @@ namespace Falcor
      
 
         uint32_t TLASBuildInternal(const Options& options, const SplitHeuristicFunction& splitHeuristic, const SplitHeuristicFunction& TLASsplitHeuristic, uint64_t lightBitmask,  uint32_t depth, const Range& triangleRange, BuildingData& data);
+
+        uint32_t TLASReBuildInternal(const Options& options, const SplitHeuristicFunction& TLASsplitHeuristic, uint64_t lightBitmask, uint32_t depth, const Range& triangleRange, BuildingData& data);
 
 
         uint32_t BLASBuildInternal(const Options& options, const SplitHeuristicFunction& splitHeuristic, uint64_t bitmask, uint32_t depth, const Range& triangleRange, BuildingData& data, uint32_t lightId);

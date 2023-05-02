@@ -75,8 +75,17 @@ namespace Falcor
         }
         else if (needsRefit)
         {
+            //float3 min, max;
+            
+            //mpBVH->mBLAS[mpBVH->lightNodeIndices[124]].getInternalNode().attribs.getAABB(min,max);
+   
+            //printf("min: %f, %f, %f\nmax: %f, %f, %f\n\n\n\n", min[0], min[1], min[2], max[0], max[1], max[2]);
             mpBVH->refit(pRenderContext);
+            
+            mpBVHBuilder->reBuild(*mpBVH);
             samplerChanged = true;
+            
+            //mpBVH->syncDataToCPU();
         }
 
         return samplerChanged;

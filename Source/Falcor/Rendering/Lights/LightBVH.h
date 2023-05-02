@@ -136,7 +136,7 @@ namespace Falcor
         */
         virtual void setShaderData(ShaderVar const& var) const;
 
-    protected:
+    
         LightBVH(const LightCollection::SharedConstPtr& pLightCollection);
 
         void finalize();
@@ -148,8 +148,10 @@ namespace Falcor
         void updateBLASIndices(uint32_t lightId);
         void renderStats(Gui::Widgets& widget, const BVHStats& stats) const;
 
+        void uploadTLASBuffer(const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks);
         void uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks);
         void syncDataToCPU() const;
+        void syncBLASDataToCPU() const;
 
         /** Invalidate the BVH.
         */
@@ -163,7 +165,7 @@ namespace Falcor
 
         // Internal state
         const LightCollection::SharedConstPtr mpLightCollection;
-
+        
         ComputePass::SharedPtr                      mBLASLeafUpdater;                   ///< Compute pass for refitting internal nodes.
         ComputePass::SharedPtr                      mBLASInternalUpdater;               ///< Compute pass for refitting internal nodes.
         ComputePass::SharedPtr                      mTLASLeafUpdater;                   ///< Compute pass for refitting internal nodes.
@@ -174,6 +176,7 @@ namespace Falcor
         mutable std::vector<PackedNode>             mBLAS;                              ///< CPU-side copy of packed BLASes nodes per light.
         mutable std::vector<uint32_t>               lightNodeIndices;                   ///< Array of first node indices of each light.
         mutable uint32_t                            mNumLights;                         //number of emissive meshes being considered
+        mutable std::vector<PackedNode>             ChangedLights;
 
         std::vector<uint32_t>                       mTLASIndices;                       ///< Array of all node indices sorted by tree depth.
         std::vector<std::vector<uint32_t>>          mBLASIndices;                       ///< Array of all node indices sorted by tree depth.
@@ -185,6 +188,8 @@ namespace Falcor
         mutable bool                                mIsCpuDataValid = false;            ///< Indicates whether the CPU-side data matches the GPU buffers.
 
         // GPU resources
+        Buffer::SharedPtr                           mpBLASChangedRootsBuffer;                   ///< Buffer holding all BVH nodes.
+        Buffer::SharedPtr                           mpLightNodeIndicesBuffer;                   ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                           mpBVHNodesBuffer;                   ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                           mpTLASNodesBuffer;                  ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                           mpBLASNodesBuffer;                  ///< Buffer holding all BVH nodes.
