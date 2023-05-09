@@ -63,7 +63,8 @@ namespace Falcor
         if (is_set(mpScene->getUpdates(), Scene::UpdateFlags::LightCollectionChanged))
         {
             if (mOptions.buildOptions.allowRefitting && !mNeedsRebuild) needsRefit = true;
-            else mNeedsRebuild = true;
+            else
+                mNeedsRebuild = true;
         }
 
         // Rebuild BVH if it's marked as dirty.
@@ -75,17 +76,12 @@ namespace Falcor
         }
         else if (needsRefit)
         {
-            //float3 min, max;
-            
-            //mpBVH->mBLAS[mpBVH->lightNodeIndices[124]].getInternalNode().attribs.getAABB(min,max);
-   
-            //printf("min: %f, %f, %f\nmax: %f, %f, %f\n\n\n\n", min[0], min[1], min[2], max[0], max[1], max[2]);
-            mpBVH->refit(pRenderContext);
-            
-            mpBVHBuilder->reBuild(*mpBVH);
-            samplerChanged = true;
-            
-            //mpBVH->syncDataToCPU();
+            if (mpBVH->refit(pRenderContext)) {
+                mpBVHBuilder->reBuild(*mpBVH);
+                samplerChanged = true;
+            }
+
+           
         }
 
         return samplerChanged;

@@ -122,7 +122,7 @@ namespace Falcor
 
 
     // TODO: Only update the ones that moved.
-    void LightBVH::refit(RenderContext* pRenderContext)
+    bool LightBVH::refit(RenderContext* pRenderContext)
     {
         FALCOR_PROFILE("LightBVH::refit()");
 
@@ -136,10 +136,10 @@ namespace Falcor
         if (updated) {       
             TLASrefit(pRenderContext);
             mIsCpuDataValid = false;
-            syncBLASDataToCPU();
+            return true;
         }
             
-
+        return false;
         
     }
 
@@ -639,9 +639,7 @@ namespace Falcor
         std::memcpy(ChangedLights.data(), ptrBLAS, ChangedLights.size() * sizeof(ChangedLights[0]));
         mpBLASChangedRootsBuffer->unmap();
 
-        float max;
-        max = ChangedLights[124].getLeafNode().attribs.flux;
-        printf("flux of 124 is :%f\n\n", max);
+
 
         mIsCpuDataValid = true;
     }

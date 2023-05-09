@@ -85,7 +85,7 @@ namespace Falcor
             The BVH needs to have been built before trying to refit it.
             \param[in] pRenderContext The render context.
         */
-        void refit(RenderContext* pRenderContext);
+        bool refit(RenderContext* pRenderContext);
         void LightBVH::TLASrefit(RenderContext* pRenderContext);
         void LightBVH::BLASrefit(RenderContext* pRenderContext, uint32_t lightId);
         /** Perform a depth-first traversal of the BVH and run a function on each node.
