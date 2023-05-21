@@ -35,8 +35,16 @@
 #include <algorithm>
 #include <numeric>
 
+
+
+
 namespace Falcor
 {
+
+    void asyncRebuild(LightBVH::SharedPtr mpBVH, LightBVHBuilder::SharedPtr mpBVHBuilder) {
+        mpBVHBuilder->reBuild(*mpBVH);
+    }
+
     namespace
     {
         const Gui::DropdownList kSolidAngleBoundList =
@@ -51,6 +59,11 @@ namespace Falcor
     {
         return SharedPtr(new LightBVHSampler(pRenderContext, pScene, options));
     }
+
+    void LightBVHSampler::unlockRebuildMutex() {
+        mpBVH->uploadGPUMutex.unlock();
+    }
+
 
     bool LightBVHSampler::update(RenderContext* pRenderContext)
     {
@@ -77,7 +90,16 @@ namespace Falcor
         else if (needsRefit)
         {
             if (mpBVH->refit(pRenderContext)) {
+                //using namespace std::literals::chrono_literals;
+                //auto start = std::chrono::high_resolution_clock::now();
                 mpBVHBuilder->reBuild(*mpBVH);
+                //mpBVH->uploadGPUMutex.lock();
+                //mpBVH->rebuildThread = std::thread{ asyncRebuild , mpBVH , mpBVHBuilder };
+                //mpBVH->threadOn = true;
+                //auto end = std::chrono::high_resolution_clock::now();
+                //std::chrono::duration<float> duration = end - start;
+                //std::cout <<duration.count() << std::endl;
+
                 samplerChanged = true;
             }
 

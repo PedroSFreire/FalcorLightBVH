@@ -113,6 +113,7 @@ namespace Falcor
         */
         LightBVH::SharedConstPtr getBVH() const;
 
+        void unlockRebuildMutex();
     protected:
         LightBVHSampler(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options);
 

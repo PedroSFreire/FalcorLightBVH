@@ -36,6 +36,7 @@
 #include <memory>
 #include <vector>
 
+
 namespace Falcor
 {
     /** Utility class for building 2-way light BVH on the CPU.

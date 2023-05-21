@@ -128,11 +128,19 @@ namespace Falcor
 
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
+        if (threadOn) {
+            threadOn = false;
+            rebuildThread.join();
+        }
 
         for (uint32_t i = 0; i < mpLightCollection->changedLights.size(); i++) {
             BLASrefit(pRenderContext, mpLightCollection->changedLights[i]);
             updated = true;
         }
+
+      
+        
+
         if (updated) {       
             TLASrefit(pRenderContext);
             mIsCpuDataValid = false;

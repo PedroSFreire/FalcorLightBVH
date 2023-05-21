@@ -272,13 +272,14 @@ namespace Falcor
         float cosConeAngle;
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
 
-        
+        bvh.uploadGPUMutex.lock();
         //bvh.finalize();
         bvh.computeTLASStats();
         bvh.updateTLASIndices();
 
         //push TLAS to gpu when safe
         bvh.uploadTLASBuffer(data.lightIndices, data.lightBitmasks);
+        bvh.uploadGPUMutex.unlock();
     }
 
     void LightBVHBuilder::build(LightBVH& bvh)

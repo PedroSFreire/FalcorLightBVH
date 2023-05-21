@@ -36,7 +36,9 @@
 #include <functional>
 #include <memory>
 #include <vector>
-#include <vector>
+#include <future>
+#include <thread>
+#include <mutex>
 
 namespace Falcor
 {
@@ -61,6 +63,10 @@ namespace Falcor
         using SharedPtr = std::shared_ptr<LightBVH>;
         using SharedConstPtr = std::shared_ptr<const LightBVH>;
 
+
+        std::thread rebuildThread;
+        std::mutex uploadGPUMutex;
+        bool threadOn = false;
         struct NodeLocation
         {
             uint32_t nodeIndex;

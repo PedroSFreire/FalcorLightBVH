@@ -30,7 +30,7 @@
 #include "RenderGraph/RenderPassHelpers.h"
 #include "RenderGraph/RenderPassStandardFlags.h"
 #include "Rendering/Lights/EmissiveUniformSampler.h"
-
+#include <mutex>
 const RenderPass::Info PathTracer::kInfo { "PathTracer", "Reference path tracer." };
 
 namespace
@@ -486,6 +486,7 @@ void PathTracer::execute(RenderContext* pRenderContext, const RenderData& render
     // This should be called after all resources have been created.
     preparePathTracer(renderData);
 
+
     // Generate paths at primary hits.
     generatePaths(pRenderContext, renderData);
 
@@ -510,8 +511,8 @@ void PathTracer::execute(RenderContext* pRenderContext, const RenderData& render
 
     // Resolve pass.
     resolvePass(pRenderContext, renderData);
-
     endFrame(pRenderContext, renderData);
+
 }
 
 void PathTracer::renderUI(Gui::Widgets& widget)
@@ -1126,6 +1127,8 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
     const auto& pOutputColor = renderData.getTexture(kOutputColor);
     FALCOR_ASSERT(pOutputColor);
 
+  
+
     // Set output frame dimension.
     setFrameDim(uint2(pOutputColor->getWidth(), pOutputColor->getHeight()));
 
@@ -1165,8 +1168,17 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
         return false;
     }
 
+
+
     // Update materials.
     prepareMaterials(pRenderContext);
+
+    if (mpEmissiveSampler)
+        if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::LightBVH)
+        {
+            if (dynamic_cast<LightBVHSampler*>(mpEmissiveSampler.get())->getBVH()->threadOn)
+                dynamic_cast<LightBVHSampler*>(mpEmissiveSampler.get())->unlockRebuildMutex();
+        }
 
     // Update the env map and emissive sampler to the current frame.
     bool lightingChanged = prepareLighting(pRenderContext);
