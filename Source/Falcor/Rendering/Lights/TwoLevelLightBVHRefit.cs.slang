@@ -28,27 +28,33 @@
 #include "Utils/Math/MathConstants.slangh"
 
 import Scene.Lights.LightCollection;
-import Rendering.Lights.LightBVH;
+import Rendering.Lights.TwoLevelLightBVH;
 
 cbuffer CB
 {
     LightCollection         gLights;            ///< The light sources.
-    RWLightBVH              gLightBVH;          ///< The BVH around the light sources.
+    RWTwoLevelLightBVH              gLightBVH;          ///< The BVH around the light sources.
     StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
     uint                    gFirstNodeOffset;   ///< The offset of the first node index in 'gNodeIndices' to be processed.
     uint                    gNodeCount;         ///< Amount of nodes that need to be processed.
 };
 
-/** Compute shader for refitting the leaf nodes.
+
+
+
+
+
+/** Compute shader for refitting the BLAS leaf nodes.
     The code assumes a leaf stores an indexed list of emissive triangles.
 */
+
 [numthreads(256, 1, 1)]
-void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
+void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
     if (DTid.x >= gNodeCount) return;
 
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
-    LeafNode node = gLightBVH.getLeafNode(nodeIndex);
+    LeafNode node = gLightBVH.getBLASLeafNode(nodeIndex);
 
     // Update the node bounding box.
     float3 aabbMin = float3(FLT_MAX);
@@ -91,31 +97,28 @@ void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
     node.attribs.coneDirection = coneDirection;
 
     // Store the updated node.
-    gLightBVH.setLeafNode(nodeIndex, node);
+    gLightBVH.setBLASLeafNode(nodeIndex, node);
 }
 
-// Returns sin(a) based on cos(a) for a in [0,pi].
-float sinFromCos(float cosAngle)
-{
-    return sqrt(max(0.0f, 1.0f - cosAngle * cosAngle));
-}
 
-/** Compute shader for refitting the internal nodes.
+
+/** Compute shader for refitting the BLAS internal nodes.
     This should be executed after updateLeafNodes().
 */
+
 [numthreads(256, 1, 1)]
-void updateInternalNodes(uint3 DTid : SV_DispatchThreadID)
+void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
 {
     if (DTid.x >= gNodeCount) return;
 
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
-    InternalNode node = gLightBVH.getInternalNode(nodeIndex);
+    InternalNode node = gLightBVH.getBLASInternalNode(nodeIndex);
 
     uint leftChildIndex = nodeIndex + 1; // Left child is stored immediately after.
     uint rightChildIndex = node.rightChildIdx;
 
-    const SharedNodeAttributes leftNode = gLightBVH.nodes[leftChildIndex].getNodeAttributes();
-    const SharedNodeAttributes rightNode = gLightBVH.nodes[rightChildIndex].getNodeAttributes();
+    const SharedNodeAttributes leftNode = gLightBVH.BLAS[leftChildIndex].getNodeAttributes();
+    const SharedNodeAttributes rightNode = gLightBVH.BLAS[rightChildIndex].getNodeAttributes();
 
     // Update the node bounding box.
     float3 leftAabbMin, leftAabbMax;
@@ -167,5 +170,142 @@ void updateInternalNodes(uint3 DTid : SV_DispatchThreadID)
     node.attribs.coneDirection = coneDirection;
 
     // Store the updated node.
-    gLightBVH.setInternalNode(nodeIndex, node);
+    gLightBVH.setBLASInternalNode(nodeIndex, node);
+
 }
+
+
+
+
+/** Compute shader for refitting the TLAS leaf nodes.
+    The code assumes a leaf stores an indexed list of emissive triangles.
+*/
+
+[numthreads(256, 1, 1)]
+void updateTLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
+{
+    if (DTid.x >= gNodeCount) return;
+    uint i = 0;
+    uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
+    LeafNode node = gLightBVH.getTLASLeafNode(nodeIndex);
+
+    InternalNode childNode = gLightBVH.getBLASInternalNode(node.triangleOffset);
+
+    //if (childNode.attribs.cosConeAngle != node.attribs.cosConeAngle ||
+    //childNode.attribs.coneDirection.x  != node.attribs.coneDirection.x  || childNode.attribs.coneDirection.y != node.attribs.coneDirection.y|| childNode.attribs.coneDirection.z != node.attribs.coneDirection.z ||
+    //childNode.attribs.origin.x != node.attribs.origin.x || childNode.attribs.origin.y != node.attribs.origin.y || childNode.attribs.origin.z != node.attribs.origin.z ||
+    //childNode.attribs.extent.x != node.attribs.extent.x || childNode.attribs.extent.y != node.attribs.extent.y || childNode.attribs.extent.z != node.attribs.extent.z )
+    //{
+        // Update the node bounding box.
+        float3 aabbMin = float3(FLT_MAX);
+        float3 aabbMax = float3(-FLT_MAX);
+
+        childNode.attribs.getAABB(aabbMin, aabbMax);
+        node.attribs.setAABB(aabbMin, aabbMax);
+
+        // Update the normal bounding cone.
+
+        node.attribs.cosConeAngle = childNode.attribs.cosConeAngle;
+        node.attribs.coneDirection = childNode.attribs.coneDirection;
+
+        node.attribs.flux = childNode.attribs.flux;
+
+        // Store the updated node.
+        LeafNode origNode = gLightBVH.getTLASLeafNode(nodeIndex);
+         
+        for(i = 0; i < gLights.meshCount;i++)
+        {
+            if(gLightBVH.lightNodeIndices[i] == node.triangleOffset)
+            {
+                gLightBVH.setChangedLightNode(i,node);
+                break;
+            }
+        }
+        
+        gLightBVH.setTLASLeafNode(nodeIndex, node);
+    //}
+}
+
+
+
+/** Compute shader for refitting the TLAS internal nodes.
+    This should be executed after updateLeafNodes().
+*/
+
+[numthreads(256, 1, 1)]
+void updateTLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
+{
+    if (DTid.x >= gNodeCount) return;
+
+    uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
+    InternalNode node = gLightBVH.getTLASInternalNode(nodeIndex);
+
+    uint leftChildIndex = nodeIndex + 1; // Left child is stored immediately after.
+    uint rightChildIndex = node.rightChildIdx;
+
+    const SharedNodeAttributes leftNode = gLightBVH.TLAS[leftChildIndex].getNodeAttributes();
+    const SharedNodeAttributes rightNode = gLightBVH.TLAS[rightChildIndex].getNodeAttributes();
+
+    // Update the node bounding box.
+    float3 leftAabbMin, leftAabbMax;
+    float3 rightAabbMin, rightAabbMax;
+    leftNode.getAABB(leftAabbMin, leftAabbMax);
+    rightNode.getAABB(rightAabbMin, rightAabbMax);
+
+    float3 aabbMin = min(leftAabbMin, rightAabbMin);
+    float3 aabbMax = max(leftAabbMax, rightAabbMax);
+
+    node.attribs.setAABB(aabbMin, aabbMax);
+
+    // Update the normal bounding cone.
+    float3 coneDirectionSum = leftNode.coneDirection + rightNode.coneDirection;
+    float coneDirectionLength = length(coneDirectionSum);
+    float3 coneDirection = coneDirectionSum / coneDirectionLength;
+    float cosConeAngle = kInvalidCosConeAngle;
+
+    if (coneDirectionLength >= FLT_MIN &&
+        leftNode.cosConeAngle != kInvalidCosConeAngle && rightNode.cosConeAngle != kInvalidCosConeAngle)
+    {
+        // This code rotates (cosLeftDiffAngle, sinLeftDiffAngle) counterclockwise by the left child's
+        // cone spread angle, and similarly for the right child's cone.
+        float cosLeftDiffAngle = dot(coneDirection, leftNode.coneDirection);
+        float sinLeftDiffAngle = sinFromCos(cosLeftDiffAngle);
+
+        float cosRightDiffAngle = dot(coneDirection, rightNode.coneDirection);
+        float sinRightDiffAngle = sinFromCos(cosRightDiffAngle);
+
+        float sinLeftConeAngle = sinFromCos(leftNode.cosConeAngle);
+        float sinRightConeAngle = sinFromCos(rightNode.cosConeAngle);
+
+        float sinLeftTotalAngle = sinLeftConeAngle * cosLeftDiffAngle + sinLeftDiffAngle * leftNode.cosConeAngle;
+        float sinRightTotalAngle = sinRightConeAngle * cosRightDiffAngle + sinRightDiffAngle * rightNode.cosConeAngle;
+
+        // If neither sum of angles is greater than pi, compute the new cosConeAngle.
+        // Otherwise, deactivate the orientation cone as useless since it would represent the whole sphere.
+        if (sinLeftTotalAngle > 0.0f && sinRightTotalAngle > 0.0f)
+        {
+            const float cosLeftTotalAngle = leftNode.cosConeAngle * cosLeftDiffAngle - sinLeftConeAngle * sinLeftDiffAngle;
+            const float cosRightTotalAngle = rightNode.cosConeAngle * cosRightDiffAngle - sinRightConeAngle * sinRightDiffAngle;
+
+            cosConeAngle = min(cosLeftTotalAngle, cosRightTotalAngle);
+            cosConeAngle = max(cosConeAngle, -1.f); // Guard against numerical errors
+        }
+    }
+
+    node.attribs.cosConeAngle = cosConeAngle;
+    node.attribs.coneDirection = coneDirection;
+
+    // Store the updated node.
+    gLightBVH.setTLASInternalNode(nodeIndex, node);
+}
+
+
+
+// Returns sin(a) based on cos(a) for a in [0,pi].
+float sinFromCos(float cosAngle)
+{
+    return sqrt(max(0.0f, 1.0f - cosAngle * cosAngle));
+}
+
+
+

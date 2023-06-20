@@ -44,6 +44,10 @@
 
 namespace Falcor
 {
+    //frame to stop animation at for testing
+    const uint64_t targetFrame = 500;
+
+
     IFramework* gpFramework = nullptr;
 
     void Sample::handleWindowSizeChange()
@@ -476,6 +480,9 @@ namespace Falcor
         // Check clock exit condition
         if (mClock.shouldExit()) postQuitMessage(0);
 
+
+        if (mClock.getFrame() == targetFrame)
+            mClock.pause();
         mClock.tick();
         mFrameRate.newFrame();
         if (mVideoCapture.fixedTimeDelta) { mClock.setTime(mVideoCapture.currentTime); }

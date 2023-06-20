@@ -27,8 +27,8 @@
  **************************************************************************/
 #pragma once
 #include "EmissiveLightSampler.h"
-#include "LightBVH.h"
-#include "LightBVHBuilder.h"
+#include "TwoLevelLightBVH.h"
+#include "TwoLevelLightBVHBuilder.h"
 #include "LightBVHSamplerSharedDefinitions.slang"
 #include "Core/Macros.h"
 #include "Utils/Math/AABB.h"
@@ -41,18 +41,18 @@ namespace Falcor
         passed to RenderPass::execute() via a field with this name in the
         dictionary.
     */
-    static const char kLightingAccelerationStructure[] = "_lightingAccelerationStructure";
+    //static const char kLightingAccelerationStructure[] = "_lightingAccelerationStructure";
 
     /** Emissive light sampler using a light BVH.
 
         This class wraps a LightCollection object, which holds the set of lights to sample.
         Internally, the class build a BVH over the light sources.
     */
-    class FALCOR_API LightBVHSampler : public EmissiveLightSampler
+    class FALCOR_API TwoLevelLightBVHSampler : public EmissiveLightSampler
     {
     public:
-        using SharedPtr = std::shared_ptr<LightBVHSampler>;
-        using SharedConstPtr = std::shared_ptr<const LightBVHSampler>;
+        using SharedPtr = std::shared_ptr<TwoLevelLightBVHSampler>;
+        using SharedConstPtr = std::shared_ptr<const TwoLevelLightBVHSampler>;
 
         /** LightBVHSampler configuration.
             Note if you change options, please update FALCOR_SCRIPT_BINDING in LightBVHSampler.cpp
@@ -60,7 +60,7 @@ namespace Falcor
         struct Options
         {
             // Build options
-            LightBVHBuilder::Options buildOptions;
+            TwoLevelLightBVHBuilder::Options buildOptions;
 
             // Traversal options
             bool        useBoundingCone = true;             ///< Use bounding cone to BVH nodes to bound NdotL when computing probabilities.
@@ -74,7 +74,7 @@ namespace Falcor
             Options() {}
         };
 
-        virtual ~LightBVHSampler() = default;
+        virtual ~TwoLevelLightBVHSampler() = default;
 
         /** Creates a LightBVHSampler for a given scene.
             \param[in] pRenderContext The render context.
@@ -111,17 +111,18 @@ namespace Falcor
         /** Returns the light BVH acceleration structure.
             \return Light BVH object or nullptr if BVH is not valid.
         */
-        LightBVH::SharedConstPtr getBVH() const;
+        TwoLevelLightBVH::SharedConstPtr getBVH() const;
 
+        void unlockRebuildMutex();
     protected:
-        LightBVHSampler(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options);
+        TwoLevelLightBVHSampler(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options);
 
         // Configuration
         Options                         mOptions;               ///< Current configuration options.
 
         // Internal state
-        LightBVHBuilder::SharedPtr      mpBVHBuilder;           ///< The light BVH builder.
-        LightBVH::SharedPtr             mpBVH;                  ///< The light BVH.
+        TwoLevelLightBVHBuilder::SharedPtr      mpBVHBuilder;           ///< The light BVH builder.
+        TwoLevelLightBVH::SharedPtr             mpBVH;                  ///< The light BVH.
         bool                            mNeedsRebuild = true;   ///< Trigger rebuild on the next call to update(). We should always build on the first call, so the initial value is true.
     };
 }

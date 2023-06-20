@@ -25,7 +25,7 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#include "LightBVHSampler.h"
+#include "TwoLevelLightBVHSampler.h"
 #include "Core/Assert.h"
 #include "Core/Errors.h"
 #include "Utils/Timing/Profiler.h"
@@ -35,8 +35,16 @@
 #include <algorithm>
 #include <numeric>
 
+
+
+
 namespace Falcor
 {
+
+    void asyncRebuild(TwoLevelLightBVH::SharedPtr mpBVH, TwoLevelLightBVHBuilder::SharedPtr mpBVHBuilder) {
+        mpBVHBuilder->reBuild(*mpBVH);
+    }
+
     namespace
     {
         const Gui::DropdownList kSolidAngleBoundList =
@@ -47,14 +55,19 @@ namespace Falcor
         };
     }
 
-    LightBVHSampler::SharedPtr LightBVHSampler::create(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options)
+    TwoLevelLightBVHSampler::SharedPtr TwoLevelLightBVHSampler::create(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options)
     {
-        return SharedPtr(new LightBVHSampler(pRenderContext, pScene, options));
+        return SharedPtr(new TwoLevelLightBVHSampler(pRenderContext, pScene, options));
     }
 
-    bool LightBVHSampler::update(RenderContext* pRenderContext)
+    void TwoLevelLightBVHSampler::unlockRebuildMutex() {
+        mpBVH->uploadGPUMutex.unlock();
+    }
+
+
+    bool TwoLevelLightBVHSampler::update(RenderContext* pRenderContext)
     {
-        FALCOR_PROFILE("LightBVHSampler::update");
+        FALCOR_PROFILE("TwoLevelLightBVHSampler::update");
 
         bool samplerChanged = false;
         bool needsRefit = false;
@@ -63,7 +76,8 @@ namespace Falcor
         if (is_set(mpScene->getUpdates(), Scene::UpdateFlags::LightCollectionChanged))
         {
             if (mOptions.buildOptions.allowRefitting && !mNeedsRebuild) needsRefit = true;
-            else mNeedsRebuild = true;
+            else
+                mNeedsRebuild = true;
         }
 
         // Rebuild BVH if it's marked as dirty.
@@ -75,14 +89,27 @@ namespace Falcor
         }
         else if (needsRefit)
         {
-            mpBVH->refit(pRenderContext);
-            samplerChanged = true;
+            if (mpBVH->refit(pRenderContext)) {
+                //using namespace std::literals::chrono_literals;
+                //auto start = std::chrono::high_resolution_clock::now();
+                mpBVHBuilder->reBuild(*mpBVH);
+                //mpBVH->uploadGPUMutex.lock();
+                //mpBVH->rebuildThread = std::thread{ asyncRebuild , mpBVH , mpBVHBuilder };
+                //mpBVH->threadOn = true;
+                //auto end = std::chrono::high_resolution_clock::now();
+                //std::chrono::duration<float> duration = end - start;
+                //std::cout <<duration.count() << std::endl;
+
+                samplerChanged = true;
+            }
+
+           
         }
 
         return samplerChanged;
     }
 
-    Program::DefineList LightBVHSampler::getDefines() const
+    Program::DefineList TwoLevelLightBVHSampler::getDefines() const
     {
         // Call the base class first.
         auto defines = EmissiveLightSampler::getDefines();
@@ -98,14 +125,14 @@ namespace Falcor
         return defines;
     }
 
-    void LightBVHSampler::setShaderData(const ShaderVar& var) const
+    void TwoLevelLightBVHSampler::setShaderData(const ShaderVar& var) const
     {
         FALCOR_ASSERT(var.isValid());
         FALCOR_ASSERT(mpBVH);
-        mpBVH->setShaderData(var["_lightBVH"]);
+        mpBVH->setShaderData(var["_twoLevelLightBVH"]);
     }
 
-    bool LightBVHSampler::renderUI(Gui::Widgets& widgets)
+    bool TwoLevelLightBVHSampler::renderUI(Gui::Widgets& widgets)
     {
         bool optionsChanged = false;
 
@@ -147,33 +174,33 @@ namespace Falcor
         return optionsChanged;
     }
 
-    LightBVH::SharedConstPtr LightBVHSampler::getBVH() const
+    TwoLevelLightBVH::SharedConstPtr TwoLevelLightBVHSampler::getBVH() const
     {
         return mpBVH->isValid() ? mpBVH : nullptr;
     }
 
-    LightBVHSampler::LightBVHSampler(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options)
-        : EmissiveLightSampler(EmissiveLightSamplerType::LightBVH, pScene)
+    TwoLevelLightBVHSampler::TwoLevelLightBVHSampler(RenderContext* pRenderContext, Scene::SharedPtr pScene, const Options& options)
+        : EmissiveLightSampler(EmissiveLightSamplerType::TwoLevelLightBVH, pScene)
         , mOptions(options)
     {
         // Create the BVH and builder.
-        mpBVHBuilder = LightBVHBuilder::create(mOptions.buildOptions);
+        mpBVHBuilder = TwoLevelLightBVHBuilder::create(mOptions.buildOptions);
         if (!mpBVHBuilder) throw RuntimeError("Failed to create BVH builder");
 
-        mpBVH = LightBVH::create(pScene->getLightCollection(pRenderContext));
+        mpBVH = TwoLevelLightBVH::create(pScene->getLightCollection(pRenderContext));
         if (!mpBVH) throw RuntimeError("Failed to create BVH");
     }
 
-    FALCOR_SCRIPT_BINDING(LightBVHSampler)
+    FALCOR_SCRIPT_BINDING(TwoLevelLightBVHSampler)
     {
-        pybind11::enum_<SolidAngleBoundMethod> solidAngleBoundMethod(m, "SolidAngleBoundMethod");
-        solidAngleBoundMethod.value("BoxToAverage", SolidAngleBoundMethod::BoxToAverage);
-        solidAngleBoundMethod.value("BoxToCenter", SolidAngleBoundMethod::BoxToCenter);
-        solidAngleBoundMethod.value("Sphere", SolidAngleBoundMethod::Sphere);
+        //pybind11::enum_<SolidAngleBoundMethod> solidAngleBoundMethod(m, "SolidAngleBoundMethod");
+        //solidAngleBoundMethod.value("BoxToAverage", SolidAngleBoundMethod::BoxToAverage);
+        //solidAngleBoundMethod.value("BoxToCenter", SolidAngleBoundMethod::BoxToCenter);
+        //solidAngleBoundMethod.value("Sphere", SolidAngleBoundMethod::Sphere);
 
         // TODO use a nested class in the bindings when supported.
-        ScriptBindings::SerializableStruct<LightBVHSampler::Options> options(m, "LightBVHSamplerOptions");
-#define field(f_) field(#f_, &LightBVHSampler::Options::f_)
+        ScriptBindings::SerializableStruct<TwoLevelLightBVHSampler::Options> options(m, "TwoLevelLightBVHSamplerOptions");
+#define field(f_) field(#f_, &TwoLevelLightBVHSampler::Options::f_)
         options.field(buildOptions);
         options.field(useBoundingCone);
         options.field(useLightingCone);

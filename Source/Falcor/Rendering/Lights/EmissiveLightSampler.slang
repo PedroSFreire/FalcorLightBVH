@@ -52,6 +52,10 @@ __exported import Utils.Sampling.SampleGeneratorInterface;
     import Rendering.Lights.LightBVHSampler;
     typedef LightBVHSampler EmissiveLightSampler;
 
+#elif _EMISSIVE_LIGHT_SAMPLER_TYPE == EMISSIVE_TWO_LEVEL_LIGHT_SAMPLER_LIGHT_BVH
+    import Rendering.Lights.TwoLevelLightBVHSampler;
+    typedef TwoLevelLightBVHSampler EmissiveLightSampler;
+
 #elif _EMISSIVE_LIGHT_SAMPLER_TYPE == EMISSIVE_LIGHT_SAMPLER_POWER
     import Rendering.Lights.EmissivePowerSampler;
     typedef EmissivePowerSampler EmissiveLightSampler;

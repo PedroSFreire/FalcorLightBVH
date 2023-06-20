@@ -37,7 +37,7 @@
 #include "Utils/Logger.h"
 #include "Utils/Timing/Profiler.h"
 #include "Utils/Scripting/ScriptBindings.h"
-#include "Rendering/Lights/LightBVHSampler.h"
+#include "Rendering/Lights/TwoLightBVHSampler.h"
 
 namespace Falcor
 {
@@ -330,7 +330,7 @@ namespace Falcor
 
         // Create emissive light sampler.
         mpEmissiveSampler = pEmissiveSampler;
-        if (!mpEmissiveSampler) mpEmissiveSampler = LightBVHSampler::create(pRenderContext, mpScene);
+        if (!mpEmissiveSampler) mpEmissiveSampler = TwoLevelLightBVHSampler::create(pRenderContext, mpScene);
         FALCOR_ASSERT(mpEmissiveSampler);
 
         // Prepare our programs for the scene.
