@@ -37,6 +37,8 @@ cbuffer CB
     StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
     uint                    gFirstNodeOffset;   ///< The offset of the first node index in 'gNodeIndices' to be processed.
     uint                    gNodeCount;         ///< Amount of nodes that need to be processed.
+    StructuredBuffer<uint>  gFirstNodeOffsetVec;   ///< The offset of the first node index in 'gNodeIndices' to be processed.
+    StructuredBuffer<uint>  gNodeCountVec;         ///< Amount of nodes that need to be processed.
 };
 
 
@@ -51,9 +53,18 @@ cbuffer CB
 [numthreads(256, 1, 1)]
 void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    if (DTid.x >= gNodeCount) return;
+    //if (DTid.x >= gNodeCount) return;
 
-    uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
+    uint count = DTid.x;
+    uint i = 0;
+    for(i=0; i<gNodeCount ; i++){
+        if(gNodeCountVec[i] == 0)continue;
+        if(gNodeCountVec[i] > count)
+            count -= gNodeCountVec[i];
+        else
+            break;
+    }
+    uint nodeIndex = gNodeIndices[gFirstNodeOffsetVec[i] + count];
     LeafNode node = gLightBVH.getBLASLeafNode(nodeIndex);
 
     // Update the node bounding box.
@@ -109,9 +120,18 @@ void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 [numthreads(256, 1, 1)]
 void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    if (DTid.x >= gNodeCount) return;
+    //if (DTid.x >= gNodeCount) return;
 
-    uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
+       uint count = DTid.x;
+    uint i = 0;
+    for(i=0; i<gNodeCount ; i++){
+        if(gNodeCountVec[i] == 0)continue;
+        if(gNodeCountVec[i] > count)
+            count -= gNodeCountVec[i];
+        else
+            break;
+    }
+    uint nodeIndex = gNodeIndices[gFirstNodeOffsetVec[i] + count];
     InternalNode node = gLightBVH.getBLASInternalNode(nodeIndex);
 
     uint leftChildIndex = nodeIndex + 1; // Left child is stored immediately after.

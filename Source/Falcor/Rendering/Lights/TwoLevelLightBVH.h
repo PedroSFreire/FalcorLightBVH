@@ -92,7 +92,7 @@ namespace Falcor
         */
         bool refit(RenderContext* pRenderContext);
         void TwoLevelLightBVH::TLASrefit(RenderContext* pRenderContext);
-        void TwoLevelLightBVH::BLASrefit(RenderContext* pRenderContext, uint32_t lightId);
+        void TwoLevelLightBVH::BLASrefit(RenderContext* pRenderContext);
         /** Perform a depth-first traversal of the BVH and run a function on each node.
             \param[in] evalInternal Function called on each internal node.
             \param[in] evalLeaf Function called on each leaf node.
@@ -107,7 +107,8 @@ namespace Falcor
         struct BVHStats
         {
             std::vector<uint32_t> TLASNodeCountPerLevel;         ///< For each level in the tree, how many nodes are there.
-
+            uint32_t MaxBLASHeight = 0;
+            uint32_t MaxBLASSize = 0;
             uint32_t TLASHeight = 0;                            ///< Number of edges on the longest path between the root node and a leaf.
             std::vector<uint32_t> BLASHeight;                            ///< Number of edges on the longest path between the root node and a leaf.
             uint32_t minTLASDepth = 0;                           ///< Number of edges on the shortest path between the root node and a leaf.
@@ -205,7 +206,9 @@ namespace Falcor
         Buffer::SharedPtr                           mpLightBitmasksBuffer;              ///< Array containing the per light bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
         Buffer::SharedPtr                           mpTLASIndicesBuffer;                ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
         std::vector<Buffer::SharedPtr>              mpBLASIndicesBuffer;                ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
-
+        Buffer::SharedPtr                           mpBLASIndicesBuffer2;               ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
+        std::vector < Buffer::SharedPtr>            mPerDepthBLASSize;  ///< Array containing for each level the number of internal nodes as well as the corresponding offset into 'mpNodeIndicesBuffer'; the very last entry contains the same data, but for all leaf nodes instead.
+        std::vector < Buffer::SharedPtr>            mPerDepthBLASOffset;  ///< Array containing for each level the number of internal nodes as well as the corresponding offset into 'mpNodeIndicesBuffer'; the very last entry contains the same data, but for all leaf nodes instead.
         friend LightBVHBuilder;
     };
 }
