@@ -104,9 +104,9 @@ namespace Falcor
             refitLevelWorkOffSets[i].resize(mpLightCollection->changedLights.size());
         }
         
-        for (uint32_t i = 0; i < mpLightCollection->changedLights.size(); i++) {
+        for (int i = 0; i < mpLightCollection->changedLights.size(); i++) {
             light = mpLightCollection->changedLights[i];
-            for (uint32_t j = mPerDepthBLASRefitEntryInfo[light].size()-1; j > 0 ; j--) {
+            for (int j = mPerDepthBLASRefitEntryInfo[light].size()-1; j >= 0 ; j--) {
                 refitLevelWorkCount[mPerDepthBLASRefitEntryInfo[light].size()-j-1][i] = mPerDepthBLASRefitEntryInfo[light][j].count;
                 refitLevelWorkOffSets[mPerDepthBLASRefitEntryInfo[light].size() - j - 1][i] = mPerDepthBLASRefitEntryInfo[light][j].offset;
             }      
@@ -477,14 +477,13 @@ namespace Falcor
         FALCOR_ASSERT(isValid());
         mPerDepthBLASRefitEntryInfo[lightId].clear();
         mPerDepthBLASRefitEntryInfo[lightId].resize(mBVHStats.BLASHeight[lightId] + 1);
-        mPerDepthBLASRefitEntryInfo[lightId].back().count = mBVHStats.BLASLeafNodeCount[lightId];
         if (mBVHStats.MaxBLASHeight < mBVHStats.BLASHeight[lightId])
             mBVHStats.MaxBLASHeight = mBVHStats.BLASHeight[lightId];
         if (mBVHStats.MaxBLASSize < mBVHStats.BLASLeafNodeCount[lightId] + mBVHStats.BLASInternalNodeCount[lightId])
             mBVHStats.MaxBLASSize = mBVHStats.BLASLeafNodeCount[lightId] + mBVHStats.BLASInternalNodeCount[lightId];
         traverseBLAS(
             [&](const NodeLocation& location) { ++mPerDepthBLASRefitEntryInfo[lightId][location.depth].count; return true; },
-            [](const NodeLocation& location) { return true; },lightId
+            [&](const NodeLocation& location) { ++mPerDepthBLASRefitEntryInfo[lightId][location.depth].count; return true; }, lightId
         );
 
         std::vector<uint32_t> perDepthOffset(mPerDepthBLASRefitEntryInfo[lightId].size(), 0);
@@ -510,12 +509,10 @@ namespace Falcor
         // Now that we know how many nodes are stored per level (excluding leaf nodes) and how many leaf nodes there are,
         // we can fill in the buffer with all the node indices sorted by tree level. The indices are stored as follows
         // <-- Indices to all internal nodes at level 0 --> | ... | <-- Indices to all internal nodes at level (treeHeight - 1) --> | <-- Indices to all leaf nodes -->
-        mBLASIndices[lightId].clear();
-        mBLASIndices[lightId].resize(mBVHStats.BLASInternalNodeCount[lightId] + mBVHStats.BLASLeafNodeCount[lightId], 0);
         
         traverseBLAS(
             [&](const NodeLocation& location) {  mBLASIndices2[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },
-            [&](const NodeLocation& location) { mBLASIndices2[perDepthOffset.back()++] = location.nodeIndex; return true; },lightId
+            [&](const NodeLocation& location) { mBLASIndices2[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },lightId
         );
         //old
         //if (!mpBLASIndicesBuffer[lightId] || mpBLASIndicesBuffer[lightId]->getElementCount() < mBLASIndices[lightId].size())

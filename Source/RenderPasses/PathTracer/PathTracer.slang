@@ -844,7 +844,8 @@ struct PathTracer
                 // Evaluate PDF at the hit, had it been generated with light sampling.
                 // Emissive light samplers have an option to exclusively sample the upper hemisphere.
                 bool upperHemisphere = path.isLightSampledUpper() && !path.isLightSampledLower();
-                float lightPdf = getEmissiveSelectionProbability() * emissiveSampler.evalPdf(path.origin, path.normal, upperHemisphere, hit);;
+                float lightPdf = getEmissiveSelectionProbability() * emissiveSampler.evalPdf(path.origin, path.normal, upperHemisphere, hit);
+                
 
                 // Compute MIS weight by combining this with BSDF sampling.
                 // Note we can assume path.pdf > 0.f since we shouldn't have got here otherwise.
