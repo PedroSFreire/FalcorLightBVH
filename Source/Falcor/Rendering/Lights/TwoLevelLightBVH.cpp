@@ -147,7 +147,7 @@ namespace Falcor
             for (int i = 0; i < refitLevelWorkCount[0].size(); i++) {
                 nodeCount += refitLevelWorkCount[0][i];
             }
-            var["gNodeCount"] = mpLightCollection->changedLights.size();
+            var["gNodeCount"] = nodeCount;
 
             mBLASLeafUpdater->execute(pRenderContext, nodeCount, 1, 1);
         }
@@ -156,7 +156,7 @@ namespace Falcor
         mpLightCollection->setShaderData(var["gLights"]);
         setShaderData(var["gLightBVH"]);
         var["gNodeIndices"] = mpBLASIndicesBuffer2;
-        var["gNodeCount"] = mpLightCollection->changedLights.size();
+        
         for (int i = 1; i < mBVHStats.MaxBLASHeight; i++) {
             var["gNodeCountVec"] = mPerDepthBLASSize[i];
             var["gFirstNodeOffsetVec"] = mPerDepthBLASOffset[i];
@@ -164,6 +164,7 @@ namespace Falcor
             for (int j = 0; j < refitLevelWorkCount[i].size(); j++) {
                 nodeCount += refitLevelWorkCount[i][j];
             }
+            var["gNodeCount"] = nodeCount;
             mBLASInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
         }
     }
