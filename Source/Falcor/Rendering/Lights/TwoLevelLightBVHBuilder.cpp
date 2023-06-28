@@ -249,6 +249,7 @@ namespace Falcor
         for (size_t i = 0; i < bvh.mpLightCollection->changedLights.size(); i++) {
             index = bvh.mpLightCollection->changedLights[i];
             node = bvh.ChangedLights[index].getLeafNode();
+            if (node.attribs.flux == 0)continue;
             refitLightData[index].flux = node.attribs.flux;
             refitLightData[index].cosConeAngle = node.attribs.cosConeAngle;
             refitLightData[index].coneDirection = node.attribs.coneDirection;

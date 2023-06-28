@@ -53,13 +53,12 @@ cbuffer CB
 [numthreads(256, 1, 1)]
 void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    //if (DTid.x >= gNodeCount) return;
 
     uint count = DTid.x;
     uint i = 0;
     for(i=0; i<gNodeCount ; i++){
         if(gNodeCountVec[i] == 0)continue;
-        if(gNodeCountVec[i] > count)
+        if(count > gNodeCountVec[i])
             count -= gNodeCountVec[i];
         else
             break;
@@ -120,13 +119,12 @@ void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 [numthreads(256, 1, 1)]
 void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    //if (DTid.x >= gNodeCount) return;
 
        uint count = DTid.x;
     uint i = 0;
     for(i=0; i<gNodeCount ; i++){
         if(gNodeCountVec[i] == 0)continue;
-        if(gNodeCountVec[i] > count)
+        if(count > gNodeCountVec[i] )
             count -= gNodeCountVec[i];
         else
             break;

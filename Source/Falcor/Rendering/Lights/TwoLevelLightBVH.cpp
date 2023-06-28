@@ -84,6 +84,8 @@ namespace Falcor
 
     void TwoLevelLightBVH::BLASrefit(RenderContext* pRenderContext)
     {
+        using namespace std::literals::chrono_literals;
+        auto start = std::chrono::high_resolution_clock::now();
         //all both vector are [depth][light] with depth 0 being the leaf nodes
         std::vector<std::vector<uint32_t>>  refitLevelWorkCount;
         std::vector<std::vector<uint32_t>>  refitLevelWorkOffSets;
@@ -94,6 +96,9 @@ namespace Falcor
         refitLevelWorkCount.resize(mBVHStats.MaxBLASHeight+1);
         refitLevelWorkOffSets.resize(mBVHStats.MaxBLASHeight+1);
         int light = 0;
+
+
+
         for (uint32_t i = 0; i < mBVHStats.MaxBLASHeight; i++) {
             refitLevelWorkCount[i].resize(mpLightCollection->changedLights.size());
             refitLevelWorkOffSets[i].resize(mpLightCollection->changedLights.size());
@@ -111,7 +116,7 @@ namespace Falcor
             if (!mPerDepthBLASSize[i] || mPerDepthBLASSize[i]->getElementCount() < refitLevelWorkCount[i].size())
             {
                 mPerDepthBLASSize[i] = Buffer::createStructured(sizeof(uint32_t), (uint32_t)refitLevelWorkCount[i].size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
-                mPerDepthBLASSize[i]->setName("LightBVH::mPerDepthBLASSize");
+                mPerDepthBLASSize[i]->setName("LightBVH::mPerDepthBLASSize"+ std::to_string(i));
             }
 
             mPerDepthBLASSize[i]->setBlob(refitLevelWorkCount[i].data(), 0, refitLevelWorkCount[i].size() * sizeof(uint32_t));
@@ -119,14 +124,17 @@ namespace Falcor
             if (!mPerDepthBLASOffset[i] || mPerDepthBLASOffset[i]->getElementCount() < refitLevelWorkOffSets[i].size())
             {
                 mPerDepthBLASOffset[i] = Buffer::createStructured(sizeof(uint32_t), (uint32_t)refitLevelWorkOffSets[i].size(), ResourceBindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr, false);
-                mPerDepthBLASOffset[i]->setName("LightBVH::mPerDepthBLASOffset");
+                mPerDepthBLASOffset[i]->setName("LightBVH::mPerDepthBLASOffset"+ std::to_string(i));
             }
 
             mPerDepthBLASOffset[i]->setBlob(refitLevelWorkOffSets[i].data(), 0, refitLevelWorkOffSets[i].size() * sizeof(uint32_t));
         }
 
-        
 
+
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
+        std::cout << duration.count() << std::endl;
         // Update all BLAS leaf nodes.
         {
             auto var = mBLASLeafUpdater->getVars()["CB"];
@@ -135,12 +143,11 @@ namespace Falcor
             var["gNodeIndices"] = mpBLASIndicesBuffer2;
             var["gNodeCountVec"] = mPerDepthBLASSize[0];
             var["gFirstNodeOffsetVec"] = mPerDepthBLASOffset[0];
-            var["gNodeCount"] = mpLightCollection->changedLights.size();
             uint32_t nodeCount = 0;
             for (int i = 0; i < refitLevelWorkCount[0].size(); i++) {
                 nodeCount += refitLevelWorkCount[0][i];
             }
-            
+            var["gNodeCount"] = mpLightCollection->changedLights.size();
 
             mBLASLeafUpdater->execute(pRenderContext, nodeCount, 1, 1);
         }
@@ -179,15 +186,15 @@ namespace Falcor
         }
 
         if (mpLightCollection->changedLights.size() > 0) {
-            using namespace std::literals::chrono_literals;
-            auto start = std::chrono::high_resolution_clock::now();
+            //using namespace std::literals::chrono_literals;
+            //auto start = std::chrono::high_resolution_clock::now();
 
             BLASrefit(pRenderContext);
             updated = true;
 
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<float> duration = end - start;
-            std::cout << duration.count() << std::endl;
+            //auto end = std::chrono::high_resolution_clock::now();
+            //std::chrono::duration<float> duration = end - start;
+            //std::cout << duration.count() << std::endl;
         }
 
         if (updated) {       
@@ -481,7 +488,8 @@ namespace Falcor
         );
 
         std::vector<uint32_t> perDepthOffset(mPerDepthBLASRefitEntryInfo[lightId].size(), 0);
-        mPerDepthBLASRefitEntryInfo[lightId][0].offset = lightNodeIndices[lightId];
+
+        perDepthOffset[0] = mPerDepthBLASRefitEntryInfo[lightId][0].offset = lightNodeIndices[lightId];
         for (std::size_t i = 1; i < mPerDepthBLASRefitEntryInfo[lightId].size(); ++i)
         {
             uint32_t currentOffset = mPerDepthBLASRefitEntryInfo[lightId][i - 1].offset + mPerDepthBLASRefitEntryInfo[lightId][i - 1].count;
