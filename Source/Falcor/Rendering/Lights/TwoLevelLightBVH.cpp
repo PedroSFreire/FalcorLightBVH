@@ -477,13 +477,14 @@ namespace Falcor
         FALCOR_ASSERT(isValid());
         mPerDepthBLASRefitEntryInfo[lightId].clear();
         mPerDepthBLASRefitEntryInfo[lightId].resize(mBVHStats.BLASHeight[lightId] + 1);
+        mPerDepthBLASRefitEntryInfo[lightId].back().count = mBVHStats.BLASLeafNodeCount[lightId];
         if (mBVHStats.MaxBLASHeight < mBVHStats.BLASHeight[lightId])
             mBVHStats.MaxBLASHeight = mBVHStats.BLASHeight[lightId];
         if (mBVHStats.MaxBLASSize < mBVHStats.BLASLeafNodeCount[lightId] + mBVHStats.BLASInternalNodeCount[lightId])
             mBVHStats.MaxBLASSize = mBVHStats.BLASLeafNodeCount[lightId] + mBVHStats.BLASInternalNodeCount[lightId];
         traverseBLAS(
             [&](const NodeLocation& location) { ++mPerDepthBLASRefitEntryInfo[lightId][location.depth].count; return true; },
-            [&](const NodeLocation& location) { ++mPerDepthBLASRefitEntryInfo[lightId][location.depth].count; return true; }, lightId
+            [&](const NodeLocation& location) { return true; }, lightId
         );
 
         std::vector<uint32_t> perDepthOffset(mPerDepthBLASRefitEntryInfo[lightId].size(), 0);
@@ -512,7 +513,7 @@ namespace Falcor
         
         traverseBLAS(
             [&](const NodeLocation& location) {  mBLASIndices2[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },
-            [&](const NodeLocation& location) { mBLASIndices2[perDepthOffset[location.depth]++] = location.nodeIndex; return true; },lightId
+            [&](const NodeLocation& location) { mBLASIndices2[perDepthOffset.back()++] = location.nodeIndex; return true; },lightId
         );
         //old
         //if (!mpBLASIndicesBuffer[lightId] || mpBLASIndicesBuffer[lightId]->getElementCount() < mBLASIndices[lightId].size())
