@@ -99,7 +99,7 @@ namespace Falcor
 
 
 
-        for (uint32_t i = 0; i < mBVHStats.MaxBLASHeight; i++) {
+        for (uint32_t i = 0; i < mBVHStats.MaxBLASHeight+1; i++) {
             refitLevelWorkCount[i].resize(mpLightCollection->changedLights.size());
             refitLevelWorkOffSets[i].resize(mpLightCollection->changedLights.size());
         }
@@ -132,9 +132,7 @@ namespace Falcor
 
 
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> duration = end - start;
-        std::cout << duration.count() << std::endl;
+        
         // Update all BLAS leaf nodes.
         {
             auto var = mBLASLeafUpdater->getVars()["CB"];
@@ -167,6 +165,9 @@ namespace Falcor
             var["gNodeCount"] = nodeCount;
             mBLASInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
         }
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
+        std::cout << duration.count() << std::endl;
     }
 
 
