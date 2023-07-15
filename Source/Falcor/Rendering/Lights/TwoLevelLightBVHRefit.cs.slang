@@ -58,12 +58,13 @@ void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
     uint i = 0;
     for(i=0; i<gLights.meshCount ; i++){
         if(gNodeCountVec[i] == 0)continue;
-        if(count > gNodeCountVec[i])
+        if(count >= gNodeCountVec[i])
             count -= gNodeCountVec[i];
         else
             break;
     }
     uint nodeIndex = gNodeIndices[gFirstNodeOffsetVec[i] + count];
+   
     LeafNode node = gLightBVH.getBLASLeafNode(nodeIndex);
 
     // Update the node bounding box.
@@ -108,6 +109,7 @@ void updateBLASLeafNodes(uint3 DTid : SV_DispatchThreadID)
 
     // Store the updated node.
     gLightBVH.setBLASLeafNode(nodeIndex, node);
+    
 }
 
 
@@ -124,7 +126,7 @@ void updateBLASInternalNodes(uint3 DTid : SV_DispatchThreadID)
     uint i = 0;
     for(i=0; i<gLights.meshCount ; i++){
         if(gNodeCountVec[i] == 0)continue;
-        if(count > gNodeCountVec[i] )
+        if(count >= gNodeCountVec[i] )
             count -= gNodeCountVec[i];
         else
             break;
