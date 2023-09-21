@@ -89,6 +89,7 @@ namespace Falcor
         std::chrono::duration<float> duration = end - start;
         std::cout << duration.count() << std::endl;
         mIsCpuDataValid = false;
+
     }
 
     void LightBVH::renderUI(Gui::Widgets& widget)

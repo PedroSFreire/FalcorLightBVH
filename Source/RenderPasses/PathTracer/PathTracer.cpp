@@ -1197,12 +1197,12 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
     // Update materials.
     prepareMaterials(pRenderContext);
 
-    if (mpEmissiveSampler)
+    /*if (mpEmissiveSampler)
         if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::TwoLevelLightBVH)
         {
             if (dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->getBVH()->threadOn)
                 dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->unlockRebuildMutex();
-        }
+        }*/
 
     // Update the env map and emissive sampler to the current frame.
     bool lightingChanged = prepareLighting(pRenderContext);

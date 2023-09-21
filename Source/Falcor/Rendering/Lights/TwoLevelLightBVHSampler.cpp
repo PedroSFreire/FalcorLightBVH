@@ -89,7 +89,12 @@ namespace Falcor
         }
         else if (needsRefit)
         {
-
+            using namespace std::literals::chrono_literals;
+            auto start = std::chrono::high_resolution_clock::now();
+            mpBVH->updateRefitData(pRenderContext);
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<float> duration = end - start;
+            std::cout << duration.count() << std::endl;
             if (mpBVH->refit(pRenderContext)) {
                 //using namespace std::literals::chrono_literals;
                 //auto start = std::chrono::high_resolution_clock::now();
@@ -107,7 +112,12 @@ namespace Falcor
            
         }
         else {
-            mpBVH->threadOn = false;
+            if (mpBVH->threadOn) {
+                mpBVH->threadOn = false;
+                mpBVH->uploadGPUMutex.unlock();
+                mpBVH->rebuildThread.join();
+            }
+            
         }
 
         return samplerChanged;
