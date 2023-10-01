@@ -212,6 +212,8 @@ namespace Falcor
 
         float3 TLAScomputeLightingConesInternal(const uint32_t nodeIndex, BuildingData& data, float& cosConeAngle);
 
+        float3 BLAScomputeLightingConesInternal(const uint32_t nodeIndex, BuildingData& data, float& cosConeAngle);
+
         float3 TLASComputeLightingCone(const Range& triangleRange, const BuildingData& data, float& cosTheta);
         /** Compute lighting cone for a range of triangles.
             \param[in] triangleRange Range of triangles to process.

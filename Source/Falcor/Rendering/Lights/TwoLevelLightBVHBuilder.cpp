@@ -395,12 +395,11 @@ namespace Falcor
         float cosConeAngle;
 
 
-        //computeLightingConesInternal(0, data, cosConeAngle);
-
-        //compute this for blas roots
-
-
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
+
+        for (int i = 0; i < data.lightNodeIndices.size(); i++) {
+            BLAScomputeLightingConesInternal(data.lightNodeIndices[i], data, cosConeAngle);
+        }
 
         // The BVH is ready, mark it as valid and upload the data.
         bvh.mIsValid = true;
@@ -827,6 +826,42 @@ namespace Falcor
         {
             // Load bounding cone.
             auto attribs = data.TLAS[nodeIndex].getNodeAttributes();
+            cosConeAngle = attribs.cosConeAngle;
+            return attribs.coneDirection;
+        }
+    }
+
+
+    float3 TwoLevelLightBVHBuilder::BLAScomputeLightingConesInternal(const uint32_t nodeIndex, BuildingData& data, float& cosConeAngle)
+    {
+        if (!data.BLAS[nodeIndex].isLeaf())
+        {
+            auto node = data.BLAS[nodeIndex].getInternalNode();
+
+            uint32_t leftIndex = nodeIndex + 1;
+            uint32_t rightIndex = node.rightChildIdx;
+
+            float leftNodeCosConeAngle = kInvalidCosConeAngle;
+            float3 leftNodeConeDirection = BLAScomputeLightingConesInternal(leftIndex, data, leftNodeCosConeAngle);
+            float rightNodeCosConeAngle = kInvalidCosConeAngle;
+            float3 rightNodeConeDirection = BLAScomputeLightingConesInternal(rightIndex, data, rightNodeCosConeAngle);
+
+            // TODO: Asserts in coneUnion
+            //float3 coneDirection = coneUnion(leftNodeConeDirection, leftNodeCosConeAngle,
+                float3 coneDirection = coneUnionOld(leftNodeConeDirection, leftNodeCosConeAngle,
+                rightNodeConeDirection, rightNodeCosConeAngle, cosConeAngle);
+
+            // Update bounding cone.
+            node.attribs.cosConeAngle = cosConeAngle;
+            node.attribs.coneDirection = coneDirection;
+            data.BLAS[nodeIndex].setNodeAttributes(node.attribs);
+
+            return coneDirection;
+        }
+        else
+        {
+            // Load bounding cone.
+            auto attribs = data.BLAS[nodeIndex].getNodeAttributes();
             cosConeAngle = attribs.cosConeAngle;
             return attribs.coneDirection;
         }
