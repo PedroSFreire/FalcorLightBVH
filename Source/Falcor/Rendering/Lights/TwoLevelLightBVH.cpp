@@ -174,8 +174,6 @@ namespace Falcor
     bool TwoLevelLightBVH::refit(RenderContext* pRenderContext)
     {
         FALCOR_PROFILE("LightBVH::refit()");
-        using namespace std::literals::chrono_literals;
-        auto start = std::chrono::high_resolution_clock::now();
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
         //catch rebuild thread
@@ -183,15 +181,9 @@ namespace Falcor
             uploadGPUMutex.unlock();
 
         if (mpLightCollection->changedLights.size() > 0) {
-            //using namespace std::literals::chrono_literals;
-            //auto start = std::chrono::high_resolution_clock::now();
-
             BLASrefit(pRenderContext);
             updated = true;
 
-            //auto end = std::chrono::high_resolution_clock::now();
-            //std::chrono::duration<float> duration = end - start;
-            //std::cout << duration.count() << std::endl;
         }
 
         if (threadOn) {
@@ -202,9 +194,6 @@ namespace Falcor
         if (updated) {       
             TLASrefit(pRenderContext);
             mIsCpuDataValid = false;
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<float> duration = end - start;
-            std::cout << duration.count() << std::endl;
             return true;
         }
             

@@ -89,22 +89,15 @@ namespace Falcor
         }
         else if (needsRefit)
         {
-            using namespace std::literals::chrono_literals;
-            auto start = std::chrono::high_resolution_clock::now();
+
             mpBVH->updateRefitData(pRenderContext);
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<float> duration = end - start;
-            std::cout << duration.count() << std::endl;
+   
             if (mpBVH->refit(pRenderContext)) {
-                //using namespace std::literals::chrono_literals;
-                //auto start = std::chrono::high_resolution_clock::now();
+                //use commented code for synced rebuild
                 //mpBVHBuilder->reBuild(*mpBVH);
                 mpBVH->uploadGPUMutex.lock();
                 mpBVH->rebuildThread = std::thread{ asyncRebuild , mpBVH , mpBVHBuilder };
                 mpBVH->threadOn = true;
-                //auto end = std::chrono::high_resolution_clock::now();
-                //std::chrono::duration<float> duration = end - start;
-                //std::cout <<duration.count() << std::endl;
 
                 samplerChanged = true;
             }
