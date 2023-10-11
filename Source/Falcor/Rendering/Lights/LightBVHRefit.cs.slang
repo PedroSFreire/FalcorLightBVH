@@ -34,7 +34,7 @@ cbuffer CB
 {
     LightCollection         gLights;            ///< The light sources.
     RWLightBVH              gLightBVH;          ///< The BVH around the light sources.
-    //StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
+    StructuredBuffer<uint>  gNodeIndices;       ///< Buffer containing the indices of all the nodes. The indices are sorted by depths and laid out contiguously in memory; the indices for all the leaves are placed in the lowest level.
     uint                    gFirstNodeOffset;   ///< The offset of the first node index in 'gNodeIndices' to be processed.
     uint                    gNodeCount;         ///< Amount of nodes that need to be processed.
 };
@@ -45,7 +45,7 @@ cbuffer CB
 [numthreads(256, 1, 1)]
 void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    /*if (DTid.x >= gNodeCount) return;
+    if (DTid.x >= gNodeCount) return;
 
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
     LeafNode node = gLightBVH.getLeafNode(nodeIndex);
@@ -91,7 +91,7 @@ void updateLeafNodes(uint3 DTid : SV_DispatchThreadID)
     node.attribs.coneDirection = coneDirection;
 
     // Store the updated node.
-    gLightBVH.setLeafNode(nodeIndex, node);*/
+    gLightBVH.setLeafNode(nodeIndex, node);
 }
 
 // Returns sin(a) based on cos(a) for a in [0,pi].
@@ -106,7 +106,7 @@ float sinFromCos(float cosAngle)
 [numthreads(256, 1, 1)]
 void updateInternalNodes(uint3 DTid : SV_DispatchThreadID)
 {
-    /*if (DTid.x >= gNodeCount) return;
+    if (DTid.x >= gNodeCount) return;
 
     uint nodeIndex = gNodeIndices[gFirstNodeOffset + DTid.x];
     InternalNode node = gLightBVH.getInternalNode(nodeIndex);
@@ -160,12 +160,12 @@ void updateInternalNodes(uint3 DTid : SV_DispatchThreadID)
 
             cosConeAngle = min(cosLeftTotalAngle, cosRightTotalAngle);
             cosConeAngle = max(cosConeAngle, -1.f); // Guard against numerical errors
-        
+        }
     }
 
     node.attribs.cosConeAngle = cosConeAngle;
     node.attribs.coneDirection = coneDirection;
 
     // Store the updated node.
-    gLightBVH.setInternalNode(nodeIndex, node);*/
+    gLightBVH.setInternalNode(nodeIndex, node);
 }

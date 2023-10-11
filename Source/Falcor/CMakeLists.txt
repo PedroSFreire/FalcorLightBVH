@@ -188,6 +188,15 @@ target_sources(Falcor PRIVATE
     Rendering/Lights/LightBVHSampler.cpp
     Rendering/Lights/LightBVHSampler.h
     Rendering/Lights/LightBVHSampler.slang
+    Rendering/Lights/TwoLevelLightBVH.cpp
+    Rendering/Lights/TwoLevelLightBVH.h
+    Rendering/Lights/TwoLevelLightBVH.slang
+    Rendering/Lights/TwoLevelLightBVHBuilder.cpp
+    Rendering/Lights/TwoLevelLightBVHBuilder.h
+    Rendering/Lights/TwoLevelLightBVHRefit.cs.slang
+    Rendering/Lights/TwoLevelLightBVHSampler.cpp
+    Rendering/Lights/TwoLevelLightBVHSampler.h
+    Rendering/Lights/TwoLevelLightBVHSampler.slang
     Rendering/Lights/LightBVHSamplerSharedDefinitions.slang
     Rendering/Lights/LightBVHTypes.slang
     Rendering/Lights/LightHelpers.slang

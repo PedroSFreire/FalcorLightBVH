@@ -30,7 +30,7 @@
 #include "RenderGraph/RenderPassHelpers.h"
 #include "RenderGraph/RenderPassStandardFlags.h"
 #include "Rendering/Lights/EmissiveUniformSampler.h"
-
+#include <mutex>
 const RenderPass::Info PathTracer::kInfo { "PathTracer", "Reference path tracer." };
 
 namespace
@@ -128,11 +128,12 @@ namespace
         { (uint32_t)MISHeuristic::PowerExp, "Power heuristic" },
     };
 
-    const Gui::DropdownList kEmissiveSamplerList =
+    const Gui::DropdownList kEmissiveSamplerList = 
     {
         { (uint32_t)EmissiveLightSamplerType::Uniform, "Uniform" },
         { (uint32_t)EmissiveLightSamplerType::LightBVH, "LightBVH" },
         { (uint32_t)EmissiveLightSamplerType::Power, "Power" },
+        { (uint32_t)EmissiveLightSamplerType::TwoLevelLightBVH, "TwoLevelLightBVH" },
     };
 
     const Gui::DropdownList kLODModeList =
@@ -267,7 +268,9 @@ void PathTracer::parseDictionary(const Dictionary& dict)
         else if (key == kMISHeuristic) mStaticParams.misHeuristic = value;
         else if (key == kMISPowerExponent) mStaticParams.misPowerExponent = value;
         else if (key == kEmissiveSampler) mStaticParams.emissiveSampler = value;
-        else if (key == kLightBVHOptions) mLightBVHOptions = value;
+        else if (key == kLightBVHOptions) { mLightBVHOptions = value;
+        mTwoLevelLightBVHOptions = value;
+        }
         else if (key == kUseRTXDI) mStaticParams.useRTXDI = value;
         else if (key == kRTXDIOptions) mRTXDIOptions = value;
 
@@ -359,6 +362,12 @@ void PathTracer::validateOptions()
 
 Dictionary PathTracer::getScriptingDictionary()
 {
+
+    if (auto lightBVHSampler = std::dynamic_pointer_cast<TwoLevelLightBVHSampler>(mpEmissiveSampler))
+    {
+        mTwoLevelLightBVHOptions = lightBVHSampler->getOptions();
+    }
+    else
     if (auto lightBVHSampler = std::dynamic_pointer_cast<LightBVHSampler>(mpEmissiveSampler))
     {
         mLightBVHOptions = lightBVHSampler->getOptions();
@@ -383,7 +392,11 @@ Dictionary PathTracer::getScriptingDictionary()
     d[kMISHeuristic] = mStaticParams.misHeuristic;
     d[kMISPowerExponent] = mStaticParams.misPowerExponent;
     d[kEmissiveSampler] = mStaticParams.emissiveSampler;
-    if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::LightBVH) d[kLightBVHOptions] = mLightBVHOptions;
+    if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::TwoLevelLightBVH)
+        d[kLightBVHOptions] = mTwoLevelLightBVHOptions;
+    else
+        if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::LightBVH)
+            d[kLightBVHOptions] = mLightBVHOptions;
     d[kUseRTXDI] = mStaticParams.useRTXDI;
     d[kRTXDIOptions] = mRTXDIOptions;
 
@@ -486,6 +499,7 @@ void PathTracer::execute(RenderContext* pRenderContext, const RenderData& render
     // This should be called after all resources have been created.
     preparePathTracer(renderData);
 
+
     // Generate paths at primary hits.
     generatePaths(pRenderContext, renderData);
 
@@ -510,8 +524,8 @@ void PathTracer::execute(RenderContext* pRenderContext, const RenderData& render
 
     // Resolve pass.
     resolvePass(pRenderContext, renderData);
-
     endFrame(pRenderContext, renderData);
+
 }
 
 void PathTracer::renderUI(Gui::Widgets& widget)
@@ -919,10 +933,14 @@ void PathTracer::preparePathTracer(const RenderData& renderData)
 void PathTracer::resetLighting()
 {
     // Retain the options for the emissive sampler.
-    if (auto lightBVHSampler = std::dynamic_pointer_cast<LightBVHSampler>(mpEmissiveSampler))
+    if (auto lightBVHSampler = std::dynamic_pointer_cast<TwoLevelLightBVHSampler>(mpEmissiveSampler))
     {
-        mLightBVHOptions = lightBVHSampler->getOptions();
-    }
+        mTwoLevelLightBVHOptions = lightBVHSampler->getOptions();
+    }else
+        if (auto lightBVHSampler = std::dynamic_pointer_cast<LightBVHSampler>(mpEmissiveSampler))
+        {
+            mLightBVHOptions = lightBVHSampler->getOptions();
+        }
 
     mpEmissiveSampler = nullptr;
     mpEnvMapSampler = nullptr;
@@ -1004,6 +1022,9 @@ bool PathTracer::prepareLighting(RenderContext* pRenderContext)
             case EmissiveLightSamplerType::LightBVH:
                 mpEmissiveSampler = LightBVHSampler::create(pRenderContext, mpScene, mLightBVHOptions);
                 break;
+            case EmissiveLightSamplerType::TwoLevelLightBVH:
+                mpEmissiveSampler = TwoLevelLightBVHSampler::create(pRenderContext, mpScene, mTwoLevelLightBVHOptions);
+                break;
             case EmissiveLightSamplerType::Power:
                 mpEmissiveSampler = EmissivePowerSampler::create(pRenderContext, mpScene);
                 break;
@@ -1019,10 +1040,14 @@ bool PathTracer::prepareLighting(RenderContext* pRenderContext)
         if (mpEmissiveSampler)
         {
             // Retain the options for the emissive sampler.
-            if (auto lightBVHSampler = std::dynamic_pointer_cast<LightBVHSampler>(mpEmissiveSampler))
+            if (auto lightBVHSampler = std::dynamic_pointer_cast<TwoLevelLightBVHSampler>(mpEmissiveSampler))
             {
-                mLightBVHOptions = lightBVHSampler->getOptions();
-            }
+                mTwoLevelLightBVHOptions = lightBVHSampler->getOptions();
+            }else
+                if (auto lightBVHSampler = std::dynamic_pointer_cast<LightBVHSampler>(mpEmissiveSampler))
+                {
+                    mLightBVHOptions = lightBVHSampler->getOptions();
+                }
 
             mpEmissiveSampler = nullptr;
             lightingChanged = true;
@@ -1126,6 +1151,8 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
     const auto& pOutputColor = renderData.getTexture(kOutputColor);
     FALCOR_ASSERT(pOutputColor);
 
+  
+
     // Set output frame dimension.
     setFrameDim(uint2(pOutputColor->getWidth(), pOutputColor->getHeight()));
 
@@ -1165,8 +1192,17 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
         return false;
     }
 
+
+
     // Update materials.
     prepareMaterials(pRenderContext);
+
+    /*if (mpEmissiveSampler)
+        if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::TwoLevelLightBVH)
+        {
+            if (dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->getBVH()->threadOn)
+                dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->unlockRebuildMutex();
+        }*/
 
     // Update the env map and emissive sampler to the current frame.
     bool lightingChanged = prepareLighting(pRenderContext);

@@ -69,7 +69,7 @@ namespace Falcor
         {
             std::vector<UpdateFlags> lightsUpdateInfo;
         };
-
+        std::vector<uint32_t> changedLights;
         struct MeshLightStats
         {
             // Stats before pre-processing (input data).

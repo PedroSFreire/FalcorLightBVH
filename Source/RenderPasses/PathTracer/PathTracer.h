@@ -31,6 +31,7 @@
 #include "Utils/Debug/PixelDebug.h"
 #include "Utils/Sampling/SampleGenerator.h"
 #include "Rendering/Lights/LightBVHSampler.h"
+#include "Rendering/Lights/TwoLevelLightBVHSampler.h"
 #include "Rendering/Lights/EmissivePowerSampler.h"
 #include "Rendering/Lights/EnvMapSampler.h"
 #include "Rendering/Materials/TexLODTypes.slang"
@@ -119,7 +120,7 @@ private:
         bool        useMIS = true;                              ///< Use multiple importance sampling (MIS) when NEE is enabled.
         MISHeuristic misHeuristic = MISHeuristic::Balance;      ///< MIS heuristic.
         float       misPowerExponent = 2.f;                     ///< MIS exponent for the power heuristic. This is only used when 'PowerExp' is chosen.
-        EmissiveLightSamplerType emissiveSampler = EmissiveLightSamplerType::LightBVH;  ///< Emissive light sampler to use for NEE.
+        EmissiveLightSamplerType emissiveSampler = EmissiveLightSamplerType::TwoLevelLightBVH;  ///< Emissive light sampler to use for NEE.
         bool        useRTXDI = false;                           ///< Use RTXDI for direct illumination.
 
         // Material parameters
@@ -143,6 +144,7 @@ private:
     PathTracerParams                mParams;                    ///< Runtime path tracer parameters.
     StaticParams                    mStaticParams;              ///< Static parameters. These are set as compile-time constants in the shaders.
     LightBVHSampler::Options        mLightBVHOptions;           ///< Current options for the light BVH sampler.
+	TwoLevelLightBVHSampler::Options        mTwoLevelLightBVHOptions;           ///< Current options for the light BVH sampler.
     RTXDI::Options                  mRTXDIOptions;              ///< Current options for the RTXDI sampler.
 
     bool                            mEnabled = true;            ///< Switch to enable/disable the path tracer. When disabled the pass outputs are cleared.

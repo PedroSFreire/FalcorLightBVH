@@ -132,7 +132,7 @@ namespace Falcor
         void updateNodeIndices();
         void renderStats(Gui::Widgets& widget, const BVHStats& stats) const;
 
-        void uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks, const std::vector<uint32_t>& lightIndices, const std::vector<uint64_t>& lightBitmasks);
+        void uploadCPUBuffers(const std::vector<uint32_t>& triangleIndices, const std::vector<uint64_t>& triangleBitmasks);
         void syncDataToCPU() const;
 
         /** Invalidate the BVH.
@@ -152,12 +152,7 @@ namespace Falcor
         ComputePass::SharedPtr                mInternalUpdater;         ///< Compute pass for refitting internal nodes.
 
         // CPU resources
-
-        mutable std::vector<PackedNode>       mTLAS;                   ///< CPU-side copy of packed TLAS nodes.
-        mutable std::vector<PackedNode>       mBLAS;      ///< CPU-side copy of packed BLASes nodes per light.
-        mutable std::vector<uint32_t>         lightNodeIndices;             ///< Array of first triangle indices of each light.
-
-
+        mutable std::vector<PackedNode>       mNodes;                   ///< CPU-side copy of packed BVH nodes.
         std::vector<uint32_t>                 mNodeIndices;             ///< Array of all node indices sorted by tree depth.
         std::vector<RefitEntryInfo>           mPerDepthRefitEntryInfo;  ///< Array containing for each level the number of internal nodes as well as the corresponding offset into 'mpNodeIndicesBuffer'; the very last entry contains the same data, but for all leaf nodes instead.
         uint32_t                              mMaxTriangleCountPerLeaf = 0; ///< After the BVH is built, this contains the maximum light count per leaf node.
@@ -167,12 +162,8 @@ namespace Falcor
 
         // GPU resources
         Buffer::SharedPtr                     mpBVHNodesBuffer;         ///< Buffer holding all BVH nodes.
-        Buffer::SharedPtr                     mpTLASNodesBuffer;         ///< Buffer holding all BVH nodes.
-        Buffer::SharedPtr                     mpBLASNodesBuffer;         ///< Buffer holding all BVH nodes.
         Buffer::SharedPtr                     mpTriangleIndicesBuffer;  ///< Triangle indices sorted by leaf node. Each leaf node refers to a contiguous array of triangle indices.
         Buffer::SharedPtr                     mpTriangleBitmasksBuffer; ///< Array containing the per triangle bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
-        Buffer::SharedPtr                     mpLightIndicesBuffer;  ///< Light indices sorted by leaf node. Each leaf node refers to a contiguous array of light indices.
-        Buffer::SharedPtr                     mpLightBitmasksBuffer; ///< Array containing the per light bit pattern retracing the tree traversal to reach the triangle: 0=left child, 1=right child.
         Buffer::SharedPtr                     mpNodeIndicesBuffer;      ///< Buffer holding all node indices sorted by tree depth. This is used for BVH refit.
 
         friend LightBVHBuilder;

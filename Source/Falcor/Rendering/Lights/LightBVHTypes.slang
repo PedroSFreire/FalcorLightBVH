@@ -46,9 +46,9 @@ static const float kInvalidCosConeAngle = -1.f;
 */
 struct SharedNodeAttributes
 {
-    float3 origin;                  ///< Center of the node bounding box.
-    float3 extent;                  ///< Extent of the node bounding box. The min/max corners are at origin +- extent.
-    float flux = 0.f;               ///< Total emitted flux.
+    float3 origin;                              ///< Center of the node bounding box.
+    float3 extent;                              ///< Extent of the node bounding box. The min/max corners are at origin +- extent.
+    float flux = 0.f;                           ///< Total emitted flux.
     float cosConeAngle = kInvalidCosConeAngle;  ///< Normal bounding cone cosine spread angle in [-1,1]. If cosConeAngle == kInvalidCosConeAngle, the cone should not be used.
     float3 coneDirection = { 0.f, 0.f, 0.f };   ///< Normal bounding cone direction.
 
@@ -83,7 +83,7 @@ struct LeafNode
 {
     SharedNodeAttributes attribs;   ///< Shared node attributes (origin/extent, bounding cone, flux).
     uint triangleCount = 0;         ///< Number of triangles stored in leaf node.
-    uint triangleOffset = 0;        ///< Offset into the triangle index list where this node's triangle indices are stored.
+    uint triangleOffset = 0;        ///< Offset into the triangle index list where this node's triangle indices are stored. In the TLAS it is used as the offset for the blas vector.
 };
 
 /** Light BVH node packed into 32B.

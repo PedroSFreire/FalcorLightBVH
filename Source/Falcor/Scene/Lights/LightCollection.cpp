@@ -93,8 +93,8 @@ namespace Falcor
 
         // Update transform matrices and check for updates.
         // TODO: Move per-mesh instance update flags into Scene. Return just a list of mesh lights that have changed.
-        std::vector<uint32_t> updatedLights;
-        updatedLights.reserve(mMeshLights.size());
+        changedLights.clear();
+        changedLights.reserve(mMeshLights.size());
 
         for (uint32_t lightIdx = 0; lightIdx < mMeshLights.size(); ++lightIdx)
         {
@@ -105,14 +105,14 @@ namespace Falcor
             if (pScene->getAnimationController()->isMatrixChanged(NodeID{ instanceData.globalMatrixID })) updateFlags |= UpdateFlags::MatrixChanged;
 
             // Store update status.
-            if (updateFlags != UpdateFlags::None) updatedLights.push_back(lightIdx);
+            if (updateFlags != UpdateFlags::None) changedLights.push_back(lightIdx);
             if (pUpdateStatus) pUpdateStatus->lightsUpdateInfo.push_back(updateFlags);
         }
 
         // Update light data if needed.
-        if (!updatedLights.empty())
+        if (!changedLights.empty())
         {
-            updateTrianglePositions(pRenderContext, *pScene, updatedLights);
+            updateTrianglePositions(pRenderContext, *pScene, changedLights);
             return true;
         }
 

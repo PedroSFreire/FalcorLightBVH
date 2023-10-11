@@ -41,6 +41,7 @@ namespace Falcor
         pybind11::enum_<EmissiveLightSamplerType> type(m, "EmissiveLightSamplerType");
         type.value("Uniform", EmissiveLightSamplerType::Uniform);
         type.value("LightBVH", EmissiveLightSamplerType::LightBVH);
+        type.value("TwoLightBVH", EmissiveLightSamplerType::TwoLevelLightBVH);
         type.value("Power", EmissiveLightSamplerType::Power);
         type.value("Null", EmissiveLightSamplerType::Null);
     }

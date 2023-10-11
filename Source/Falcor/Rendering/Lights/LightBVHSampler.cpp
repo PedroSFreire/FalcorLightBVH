@@ -75,7 +75,7 @@ namespace Falcor
         }
         else if (needsRefit)
         {
-            //mpBVH->refit(pRenderContext);
+            mpBVH->refit(pRenderContext);
             samplerChanged = true;
         }
 
