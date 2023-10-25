@@ -71,7 +71,8 @@ namespace Falcor
 
         bool samplerChanged = false;
         bool needsRefit = false;
-
+        //if (mpBVH->threadOn)
+          //  mpBVH->uploadGPUMutex.unlock();
         // Check if light collection has changed.
         if (is_set(mpScene->getUpdates(), Scene::UpdateFlags::LightCollectionChanged))
         {
@@ -80,6 +81,10 @@ namespace Falcor
                 mNeedsRebuild = true;
         }
 
+        if (mpBVH->threadOn) {
+            mpBVH->rebuildThread.join();
+            mpBVH->threadOn = false;
+        }
         // Rebuild BVH if it's marked as dirty.
         if (mNeedsRebuild)
         {
@@ -142,7 +147,6 @@ namespace Falcor
     bool TwoLevelLightBVHSampler::renderUI(Gui::Widgets& widgets)
     {
         bool optionsChanged = false;
-
         if (auto buildGroup = widgets.group("BVH building options"))
         {
             if (mpBVHBuilder->renderUI(buildGroup))

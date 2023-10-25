@@ -203,6 +203,7 @@ namespace Falcor
         std::weak_ptr<Scene>                    mpScene;                ///< Weak pointer to scene (scene owns LightCollection).
 
         std::vector<MeshLightData>              mMeshLights;            ///< List of all mesh lights.
+
         uint32_t                                mTriangleCount = 0;     ///< Total number of triangles in all mesh lights (= mMeshLightTriangles.size()). This may include culled triangles.
 
         mutable std::vector<MeshLightTriangle>  mMeshLightTriangles;    ///< List of all pre-processed mesh light triangles.

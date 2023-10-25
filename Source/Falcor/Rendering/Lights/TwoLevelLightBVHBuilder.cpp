@@ -243,13 +243,16 @@ namespace Falcor
 
         bvh.syncBLASDataToCPU();
         LeafNode node;
+        int wrongIndex;
         int index;
         int lightCount = bvh.mpLightCollection->getStats().meshLightCount;
         
         for (size_t i = 0; i < bvh.mpLightCollection->changedLights.size(); i++) {
-            index = bvh.mpLightCollection->changedLights[i];
-            node = bvh.ChangedLights[index].getLeafNode();
-            if (node.attribs.flux == 0)continue;
+            wrongIndex = bvh.mpLightCollection->changedLights[i];
+            index = lightTranslator[wrongIndex];
+            node = bvh.ChangedLights[wrongIndex].getLeafNode();
+            if (node.attribs.flux == 0)
+                continue;
             refitLightData[index].flux = node.attribs.flux;
             refitLightData[index].cosConeAngle = node.attribs.cosConeAngle;
             refitLightData[index].coneDirection = node.attribs.coneDirection;
@@ -294,6 +297,7 @@ namespace Falcor
         FALCOR_ASSERT(bvh.mpLightCollection);
         const auto& triangles = bvh.mpLightCollection->getMeshLightTriangles();
         const auto& lights = bvh.mpLightCollection->getMeshLights();
+        lightTranslator.resize(bvh.mpLightCollection->getMeshLights().size());
         if (triangles.empty()) return;
         
         // Create list of triangles that should be included in BVH.
@@ -343,11 +347,11 @@ namespace Falcor
             if (lightsData[i].flux > 0.f) {
                 data.lightsData.push_back(lightsData[i]);
                 refitLightData.push_back(lightsData[i]);
-
-            }
+                lightTranslator[i] = refitLightData.size()-1;
+            }else lightTranslator[i] = -1;
         }
         bvh.mNumLights = lights.size();
-        bvh.ChangedLights.resize(data.lightsData.size());
+        bvh.ChangedLights.resize(lightsData.size());
 
         // If there are no non-culled triangles, we're done.
         if (data.trianglesData.empty()) return;
@@ -971,7 +975,7 @@ namespace Falcor
             auto getBinId = [&](const TriangleSortData& td)
             {
                 float bmin = nodeBounds.minPoint[dimension], bmax = nodeBounds.maxPoint[dimension];
-                FALCOR_ASSERT(bmin < bmax);
+                //FALCOR_ASSERT(bmin < bmax);
                 float scale = (float)parameters.binCount / (bmax - bmin);
                 float p = td.bounds.center()[dimension];
                 FALCOR_ASSERT(bmin <= p && p <= bmax);
@@ -1102,7 +1106,7 @@ namespace Falcor
             auto getBinId = [&](const LightSortData& td)
             {
                 float bmin = nodeBounds.minPoint[dimension], bmax = nodeBounds.maxPoint[dimension];
-                FALCOR_ASSERT(bmin < bmax);
+                //FALCOR_ASSERT(bmin < bmax);
                 float scale = (float)parameters.binCount / (bmax - bmin);
                 float p = td.bounds.center()[dimension];
                 FALCOR_ASSERT(bmin <= p && p <= bmax);

@@ -52,6 +52,7 @@ namespace Falcor
     class FALCOR_API Sample : public Window::ICallbacks, public IFramework
     {
     public:
+        int county = 0;
         /** Entry-point to Sample. User should call this to start processing.
             \param[in] config Requested sample configuration.
             \param[in] pRenderer The user's renderer. The Sample takes ownership of the renderer.

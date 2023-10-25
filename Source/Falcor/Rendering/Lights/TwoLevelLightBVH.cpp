@@ -176,20 +176,21 @@ namespace Falcor
         FALCOR_PROFILE("LightBVH::refit()");
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
-        //catch rebuild thread
-        if (threadOn)
-            uploadGPUMutex.unlock();
 
+        if (threadOn) {
+            threadOn = false;
+            rebuildThread.join();
+        }
         if (mpLightCollection->changedLights.size() > 0) {
             BLASrefit(pRenderContext);
             updated = true;
 
         }
 
-        if (threadOn) {
-            threadOn = false;
-            rebuildThread.join();
-        }
+       if (threadOn) {
+           threadOn = false;
+           rebuildThread.join();
+       }
 
         if (updated) {       
             TLASrefit(pRenderContext);
@@ -563,7 +564,7 @@ namespace Falcor
         }
         if (!mpBLASChangedRootsBuffer || mpBLASChangedRootsBuffer->getElementCount() < lightIndices.size())
         {
-            mpBLASChangedRootsBuffer = Buffer::createStructured(var["BLASChangedRoots"], (uint32_t)lightIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
+            mpBLASChangedRootsBuffer = Buffer::createStructured(var["BLASChangedRoots"], (uint32_t)lightNodeIndices.size(), Resource::BindFlags::None, Buffer::CpuAccess::Read, nullptr, false);
             mpBLASChangedRootsBuffer->setName("LightBVH::mpBLASChangedRootsBuffer");
         }
         if (!mpTLASNodesBuffer || mpTLASNodesBuffer->getElementCount() < mTLAS.size())

@@ -45,7 +45,7 @@
 namespace Falcor
 {
     //frame to stop animation at for testing
-    const uint64_t targetFrame = 500;
+    
 
 
     IFramework* gpFramework = nullptr;
@@ -480,9 +480,14 @@ namespace Falcor
         // Check clock exit condition
         if (mClock.shouldExit()) postQuitMessage(0);
 
-
-        if (mClock.getFrame() == targetFrame)
-            mClock.pause();
+        const uint64_t targetFrame = 50;
+        if (mClock.getFrame() >= 10 && county == 0) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 50 && county == 1) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 100 && county == 2) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 150 && county == 3) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 200 && county == 4) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 250 && county == 5) { mClock.pause(); county++; }
+        if (mClock.getFrame() == 300 && county == 6) { mClock.pause(); county++; }
         mClock.tick();
         mFrameRate.newFrame();
         if (mVideoCapture.fixedTimeDelta) { mClock.setTime(mVideoCapture.currentTime); }

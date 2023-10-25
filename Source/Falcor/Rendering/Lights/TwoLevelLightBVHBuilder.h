@@ -51,7 +51,7 @@ namespace Falcor
     public:
         using SharedPtr = std::shared_ptr<TwoLevelLightBVHBuilder>;
         using SharedConstPtr = std::shared_ptr<const TwoLevelLightBVHBuilder>;
-
+        std::vector<uint32_t> lightTranslator;
 
 
         enum class SplitHeuristic : uint32_t

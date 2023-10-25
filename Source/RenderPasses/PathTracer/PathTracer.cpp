@@ -1151,7 +1151,12 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
     const auto& pOutputColor = renderData.getTexture(kOutputColor);
     FALCOR_ASSERT(pOutputColor);
 
-  
+    if (mpEmissiveSampler)
+        if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::TwoLevelLightBVH)
+        {
+            if (dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->getBVH()->threadOn)
+                dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->unlockRebuildMutex();
+        }
 
     // Set output frame dimension.
     setFrameDim(uint2(pOutputColor->getWidth(), pOutputColor->getHeight()));
@@ -1197,12 +1202,7 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
     // Update materials.
     prepareMaterials(pRenderContext);
 
-    /*if (mpEmissiveSampler)
-        if (mStaticParams.emissiveSampler == EmissiveLightSamplerType::TwoLevelLightBVH)
-        {
-            if (dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->getBVH()->threadOn)
-                dynamic_cast<TwoLevelLightBVHSampler*>(mpEmissiveSampler.get())->unlockRebuildMutex();
-        }*/
+
 
     // Update the env map and emissive sampler to the current frame.
     bool lightingChanged = prepareLighting(pRenderContext);

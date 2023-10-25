@@ -381,7 +381,7 @@ namespace Falcor
         {
             logWarning("RtProgramVars geometry count mismatch");
         }
-
+        
         uint32_t rayTypeCount = pVars->getRayTypeCount();
         setRaytracingShaderData(pContext, pVars->getRootVar(), rayTypeCount);
 
