@@ -60,6 +60,7 @@ namespace Falcor
         using SharedPtr = std::shared_ptr<LightBVH>;
         using SharedConstPtr = std::shared_ptr<const LightBVH>;
 
+        float TotalRefitTime = 0;
         struct NodeLocation
         {
             uint32_t nodeIndex;

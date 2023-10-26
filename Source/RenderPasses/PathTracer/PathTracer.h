@@ -53,6 +53,8 @@ public:
 
     static SharedPtr create(RenderContext* pRenderContext, const Dictionary& dict);
 
+    float updateTime = 0;
+    float sampleTime = 0;
     virtual Dictionary getScriptingDictionary() override;
     virtual RenderPassReflection reflect(const CompileData& compileData) override;
     virtual void setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) override;

@@ -85,6 +85,13 @@ namespace Falcor
             mpBVH->rebuildThread.join();
             mpBVH->threadOn = false;
         }
+        if (samplerChanged == false && needsRefit == false && getBVH() != NULL ) {
+            printf("\n");
+            printf("Rebuild Time : %f  \n",getBVH().get()->TotalRebuildTime / 300);
+            printf("Refit Time : %f  \n", getBVH().get()->TotalRefitTime / 300);
+            printf("\n");
+            writen = true;
+        }
         // Rebuild BVH if it's marked as dirty.
         if (mNeedsRebuild)
         {

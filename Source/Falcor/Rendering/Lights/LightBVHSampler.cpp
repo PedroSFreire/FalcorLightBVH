@@ -65,6 +65,13 @@ namespace Falcor
             if (mOptions.buildOptions.allowRefitting && !mNeedsRebuild) needsRefit = true;
             else mNeedsRebuild = true;
         }
+        if (samplerChanged == false && needsRefit == false && getBVH() != NULL) {
+            printf("\n");
+
+            printf("Refit Time : %f  \n", getBVH().get()->TotalRefitTime / 300);
+            printf("\n");
+
+        }
 
         // Rebuild BVH if it's marked as dirty.
         if (mNeedsRebuild)

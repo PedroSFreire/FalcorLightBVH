@@ -48,6 +48,7 @@ namespace Falcor
         This class wraps a LightCollection object, which holds the set of lights to sample.
         Internally, the class build a BVH over the light sources.
     */
+    bool writen = false;
     class FALCOR_API TwoLevelLightBVHSampler : public EmissiveLightSampler
     {
     public:

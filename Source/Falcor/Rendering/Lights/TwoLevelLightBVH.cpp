@@ -84,6 +84,8 @@ namespace Falcor
     void TwoLevelLightBVH::updateRefitData(RenderContext* pRenderContext) {
         //all both vector are [depth][light] with depth 0 being the leaf nodes
 
+
+
         mPerDepthBLASSize.clear();
         mPerDepthBLASSize.resize(mBVHStats.MaxBLASHeight + 1);
         mPerDepthBLASOffset.clear();
@@ -124,6 +126,7 @@ namespace Falcor
 
             mPerDepthBLASOffset[i]->setBlob(refitLevelWorkOffSets[i].data(), 0, refitLevelWorkOffSets[i].size() * sizeof(uint32_t));
         }
+
     }
     void TwoLevelLightBVH::BLASrefit(RenderContext* pRenderContext)
     {
@@ -175,6 +178,8 @@ namespace Falcor
     {
         FALCOR_PROFILE("LightBVH::refit()");
         FALCOR_ASSERT(mIsValid);
+        using namespace std::literals::chrono_literals;
+        auto start = std::chrono::high_resolution_clock::now();
         bool updated = false;
 
         if (threadOn) {
@@ -195,9 +200,14 @@ namespace Falcor
         if (updated) {       
             TLASrefit(pRenderContext);
             mIsCpuDataValid = false;
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<float> duration = end - start;
+            TotalRefitTime += duration.count();
             return true;
         }
-            
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
+        TotalRefitTime += duration.count();
         return false;
         
     }

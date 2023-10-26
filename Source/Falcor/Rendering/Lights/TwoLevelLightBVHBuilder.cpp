@@ -240,7 +240,8 @@ namespace Falcor
     void TwoLevelLightBVHBuilder::reBuild(TwoLevelLightBVH& bvh)
     {
         FALCOR_PROFILE("LightBVHBuilder::build()");
-
+        using namespace std::literals::chrono_literals;
+        auto start = std::chrono::high_resolution_clock::now();
         bvh.syncBLASDataToCPU();
         LeafNode node;
         int wrongIndex;
@@ -276,14 +277,22 @@ namespace Falcor
         float cosConeAngle;
         TLAScomputeLightingConesInternal(0, data, cosConeAngle);
 
-        bvh.uploadGPUMutex.lock();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
 
+
+        
+        bvh.uploadGPUMutex.lock();
+        auto start2 = std::chrono::high_resolution_clock::now();
         bvh.computeTLASStats();
         bvh.updateTLASIndices();
 
         //push TLAS to gpu when safe
         bvh.uploadTLASBuffer(data.lightIndices, data.lightBitmasks);
         bvh.uploadGPUMutex.unlock();
+        auto end2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration2 = end2 - start2;
+        bvh.TotalRebuildTime += duration.count() + duration2.count();
     }
 
     void TwoLevelLightBVHBuilder::build(TwoLevelLightBVH& bvh)

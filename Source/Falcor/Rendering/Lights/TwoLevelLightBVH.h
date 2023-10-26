@@ -62,6 +62,13 @@ namespace Falcor
         using SharedPtr = std::shared_ptr<TwoLevelLightBVH>;
         using SharedConstPtr = std::shared_ptr<const TwoLevelLightBVH>;
 
+        float TotalRebuildTime = 0;
+        float TotalRefitTime = 0;
+
+
+        //float getRebuildTime() const { return TotalRebuildTime; }
+        //float getRefitTime() const { return TotalRefitTime; }
+
 
         std::thread rebuildThread;
         std::mutex uploadGPUMutex;

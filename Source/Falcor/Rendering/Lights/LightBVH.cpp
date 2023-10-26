@@ -48,7 +48,8 @@ namespace Falcor
         FALCOR_PROFILE("LightBVH::refit()");
 
         FALCOR_ASSERT(mIsValid);
-
+        using namespace std::literals::chrono_literals;
+        auto start = std::chrono::high_resolution_clock::now();
         // Update all leaf nodes.
         {
             auto var = mLeafUpdater->getVars()["CB"];
@@ -82,7 +83,9 @@ namespace Falcor
                 mInternalUpdater->execute(pRenderContext, nodeCount, 1, 1);
             }
         }
-
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
+        TotalRefitTime += duration.count();
         
         mIsCpuDataValid = false;
 
