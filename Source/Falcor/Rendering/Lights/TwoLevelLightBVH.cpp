@@ -177,20 +177,13 @@ namespace Falcor
         FALCOR_ASSERT(mIsValid);
         bool updated = false;
 
-        if (threadOn) {
-            threadOn = false;
-            rebuildThread.join();
-        }
+
         if (mpLightCollection->changedLights.size() > 0) {
             BLASrefit(pRenderContext);
             updated = true;
 
         }
 
-       if (threadOn) {
-           threadOn = false;
-           rebuildThread.join();
-       }
 
         if (updated) {       
             TLASrefit(pRenderContext);
