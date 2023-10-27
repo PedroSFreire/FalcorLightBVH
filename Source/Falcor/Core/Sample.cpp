@@ -482,7 +482,8 @@ namespace Falcor
 
         const uint64_t targetFrame = 50;
         if (mClock.getFrame() >= 10 && county == 0) { mClock.pause(); county++; }
-        if (mClock.getFrame() == 300 && county == 1) { mClock.pause(); county++;}
+        if (mClock.getFrame() == 300 && county == 1) { mClock.pause(); printf("delta is: %f", mClock.banana / 299); county++; }
+        else { if(mClock.getFrame() >= 1) mClock.banana += mClock.getDelta(); }
 
         mClock.tick();
         mFrameRate.newFrame();

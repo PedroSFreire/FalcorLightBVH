@@ -85,7 +85,6 @@ namespace Falcor
         //all both vector are [depth][light] with depth 0 being the leaf nodes
 
 
-
         mPerDepthBLASSize.clear();
         mPerDepthBLASSize.resize(mBVHStats.MaxBLASHeight + 1);
         mPerDepthBLASOffset.clear();
@@ -178,6 +177,10 @@ namespace Falcor
     {
         FALCOR_PROFILE("LightBVH::refit()");
         FALCOR_ASSERT(mIsValid);
+        if (threadOn) {
+            threadOn = false;
+            rebuildThread.join();
+        }
         using namespace std::literals::chrono_literals;
         auto start = std::chrono::high_resolution_clock::now();
         bool updated = false;
@@ -192,10 +195,6 @@ namespace Falcor
 
         }
 
-       if (threadOn) {
-           threadOn = false;
-           rebuildThread.join();
-       }
 
         if (updated) {       
             TLASrefit(pRenderContext);

@@ -41,7 +41,7 @@ namespace Falcor
     {
     public:
         Clock();
-
+        float banana = 0;
         /** Start the system
         */
         static void start();
