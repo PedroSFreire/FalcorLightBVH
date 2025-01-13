@@ -16,10 +16,12 @@ decreased an expected amount showing an increase in frame times of around 7%.
 
 PDF of the thesis and the shortpaper published at wscg also in the rep.
 
- 
+
 
  ![plot](./sample.png)
 
+ 
+The implementation is done on top of falcor 5.2 https://github.com/NVIDIAGameWorks/Falcor
   
 ## Citation
 If you use Falcor in a research project leading to a publication, please cite the project.
